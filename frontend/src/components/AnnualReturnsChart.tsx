@@ -4,6 +4,7 @@ import type { AnnualReturn } from '../utils/calculations'
 
 interface AnnualReturnsChartProps {
   data: AnnualReturn[]
+  fixedYMax: number | null
 }
 
 const MARGIN = { top: 16, right: 16, bottom: 32, left: 48 }
@@ -16,11 +17,11 @@ const GRID_LINE = '#E0C9B1'
 const ZERO_LINE = '#BEB0A3'
 const MONO_FONT = "'JetBrains Mono', ui-monospace, monospace"
 
-export default function AnnualReturnsChart({ data }: AnnualReturnsChartProps) {
+export default function AnnualReturnsChart({ data, fixedYMax }: AnnualReturnsChartProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const svgRef = useRef<SVGSVGElement>(null)
   const initialized = useRef(false)
-  const [, setResizeTick] = useState(0)
+  const [resizeTick, setResizeTick] = useState(0)
 
   useEffect(() => {
     const container = containerRef.current
@@ -41,7 +42,7 @@ export default function AnnualReturnsChart({ data }: AnnualReturnsChartProps) {
       .range([0, w])
       .padding(0.25)
 
-    const maxAbs = Math.max(
+    const maxAbs = fixedYMax ?? Math.max(
       d3.max(data, (d) => Math.abs(d.return)) ?? 0.1,
       0.02,
     )
@@ -117,7 +118,8 @@ export default function AnnualReturnsChart({ data }: AnnualReturnsChartProps) {
       .attr('opacity', 0.85)
 
     bars.exit().transition().duration(DURATION).ease(EASE).attr('height', 0).attr('y', y(0)).remove()
-  }, [data])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, fixedYMax, resizeTick])
 
   useEffect(() => {
     const container = containerRef.current

@@ -4,9 +4,11 @@ import type { CumulativePoint } from '../utils/calculations'
 
 interface CumulativeChartProps {
   data: CumulativePoint[]
+  capitalInvested: CumulativePoint[]
   dividendData: CumulativePoint[]
   benchmarkData: CumulativePoint[]
   principal: number
+  fixedYMax: number | null
 }
 
 const MARGIN = { top: 20, right: 24, bottom: 32, left: 64 }
@@ -16,16 +18,26 @@ const DURATION = 200
 const ACCENT = '#990F3D'
 const DIVIDEND_COLOR = '#2A6B6B' // deep teal
 const BENCHMARK_COLOR = '#7D7168' // muted warm gray
+const CAPITAL_COLOR = '#BEB0A3' // warm baseline
 const AXIS_TEXT = '#7D7168'
 const GRID_LINE = '#E0C9B1'
 const BASELINE_COLOR = '#BEB0A3'
 const MONO_FONT = "'JetBrains Mono', ui-monospace, monospace"
 
-export default function CumulativeChart({ data, dividendData, benchmarkData, principal }: CumulativeChartProps) {
+const TOOLTIP_BG = '#FFF1E5'
+const TOOLTIP_BORDER = '#E0C9B1'
+const TOOLTIP_TEXT = '#33302E'
+
+const dateFmt = d3.timeFormat('%b %Y')
+const dollarFmt = (n: number) => '$' + d3.format(',.0f')(n)
+const pctFmt = (n: number) => (n >= 0 ? '+' : '') + d3.format('.2%')(n)
+
+export default function CumulativeChart({ data, capitalInvested, dividendData, benchmarkData, principal, fixedYMax }: CumulativeChartProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const svgRef = useRef<SVGSVGElement>(null)
+  const tooltipRef = useRef<HTMLDivElement>(null)
   const initialized = useRef(false)
-  const [, setResizeTick] = useState(0)
+  const [resizeTick, setResizeTick] = useState(0)
 
   const parsed = useMemo(() => {
     if (data.length === 0) return []
@@ -41,6 +53,15 @@ export default function CumulativeChart({ data, dividendData, benchmarkData, pri
     if (benchmarkData.length === 0) return []
     return benchmarkData.map((d) => ({ date: new Date(d.date), value: d.value }))
   }, [benchmarkData])
+
+  const parsedCapital = useMemo(() => {
+    if (capitalInvested.length === 0) return []
+    return capitalInvested.map((d) => ({ date: new Date(d.date), value: d.value }))
+  }, [capitalInvested])
+
+  // Only show capital line when contributions make it differ from a flat principal
+  const showCapital = parsedCapital.length > 1 &&
+    parsedCapital[parsedCapital.length - 1].value > parsedCapital[0].value
 
   const showDividend = parsedDividend.length > 0
   const showBenchmark = parsedBenchmark.length > 0
@@ -59,23 +80,22 @@ export default function CumulativeChart({ data, dividendData, benchmarkData, pri
     const sel = d3.select(svg).attr('width', W).attr('height', H)
 
     const xExtent = d3.extent(parsed, (d) => d.date) as [Date, Date]
-    let yMax = d3.max(parsed, (d) => d.value) ?? principal
-    let yMin = Math.min(d3.min(parsed, (d) => d.value) ?? principal, principal)
-    if (showDividend) {
-      const divMax = d3.max(parsedDividend, (d) => d.value) ?? 0
-      const divMin = d3.min(parsedDividend, (d) => d.value) ?? 0
-      yMax = Math.max(yMax, divMax)
-      yMin = Math.min(yMin, divMin)
-    }
+
+    // Fixed Y range: floor at 0, ceiling from precomputed single-fund max
+    const yFloor = 0
+    let yCeil = fixedYMax ?? (d3.max(parsed, (d) => d.value) ?? principal)
+    // Ensure overlay data (benchmark, capital, dividends) still fits
     if (showBenchmark) {
-      const bmMax = d3.max(parsedBenchmark, (d) => d.value) ?? principal
-      const bmMin = d3.min(parsedBenchmark, (d) => d.value) ?? principal
-      yMax = Math.max(yMax, bmMax)
-      yMin = Math.min(yMin, bmMin)
+      const bmMax = d3.max(parsedBenchmark, (d) => d.value) ?? 0
+      yCeil = Math.max(yCeil, bmMax)
+    }
+    if (showCapital) {
+      const capMax = d3.max(parsedCapital, (d) => d.value) ?? 0
+      yCeil = Math.max(yCeil, capMax)
     }
 
     const x = d3.scaleTime().domain(xExtent).range([0, w])
-    const y = d3.scaleLinear().domain([yMin * 0.95, yMax * 1.05]).nice().range([h, 0])
+    const y = d3.scaleLinear().domain([yFloor, yCeil * 1.05]).nice().range([h, 0])
 
     const line = d3
       .line<{ date: Date; value: number }>()
@@ -121,10 +141,24 @@ export default function CumulativeChart({ data, dividendData, benchmarkData, pri
       g.append('line').attr('class', 'baseline')
       g.append('path').attr('class', 'area-path')
       g.append('path').attr('class', 'line-path')
+      g.append('path').attr('class', 'capital-path')
       g.append('path').attr('class', 'benchmark-path')
       g.append('path').attr('class', 'div-area-path')
       g.append('path').attr('class', 'div-line-path')
       g.append('g').attr('class', 'legend')
+
+      // Tooltip overlay elements
+      g.append('line').attr('class', 'crosshair')
+        .attr('stroke', AXIS_TEXT).attr('stroke-width', 1)
+        .attr('stroke-dasharray', '3,3').attr('opacity', 0)
+        .attr('pointer-events', 'none')
+      g.append('circle').attr('class', 'hover-dot')
+        .attr('r', 4).attr('fill', ACCENT).attr('stroke', '#fff')
+        .attr('stroke-width', 1.5).attr('opacity', 0)
+        .attr('pointer-events', 'none')
+      g.append('rect').attr('class', 'hover-overlay')
+        .attr('width', w).attr('height', h)
+        .attr('fill', 'none').attr('pointer-events', 'all')
 
       initialized.current = true
     }
@@ -148,6 +182,7 @@ export default function CumulativeChart({ data, dividendData, benchmarkData, pri
       .call((g) => g.selectAll('.tick text').attr('fill', AXIS_TEXT).attr('font-size', '10px').attr('font-family', MONO_FONT))
       .call((g) => g.selectAll('.tick line').attr('stroke', GRID_LINE).attr('stroke-opacity', 0.4).attr('stroke-dasharray', '2,3'))
 
+    // Static baseline only when no contributions (capital line replaces it)
     g.select('.baseline')
       .transition().duration(DURATION).ease(EASE)
       .attr('x1', 0).attr('x2', w)
@@ -155,6 +190,27 @@ export default function CumulativeChart({ data, dividendData, benchmarkData, pri
       .attr('stroke', BASELINE_COLOR)
       .attr('stroke-dasharray', '6,4')
       .attr('stroke-width', 1)
+      .attr('opacity', showCapital ? 0 : 1)
+
+    // Capital invested line (rising staircase when contributions active)
+    if (showCapital) {
+      const capLine = d3
+        .line<{ date: Date; value: number }>()
+        .x((d) => x(d.date))
+        .y((d) => y(d.value))
+        .curve(d3.curveStepAfter)
+
+      g.select('.capital-path')
+        .datum(parsedCapital)
+        .transition().duration(DURATION).ease(EASE)
+        .attr('d', capLine)
+        .attr('fill', 'none')
+        .attr('stroke', CAPITAL_COLOR)
+        .attr('stroke-width', 1)
+        .attr('stroke-dasharray', '6,4')
+    } else {
+      g.select('.capital-path').attr('d', null)
+    }
 
     g.select('.area-path')
       .datum(parsed)
@@ -231,6 +287,9 @@ export default function CumulativeChart({ data, dividendData, benchmarkData, pri
       legendItems.push({ label: 'Price Return', color: ACCENT })
       legendItems.push({ label: 'Cumulative Dividends', color: DIVIDEND_COLOR })
     }
+    if (showCapital) {
+      legendItems.push({ label: 'Capital Invested', color: CAPITAL_COLOR, dashed: true })
+    }
     if (showBenchmark) {
       legendItems.push({ label: 'S&P 500 (VOO)', color: BENCHMARK_COLOR, dashed: true })
     }
@@ -254,7 +313,58 @@ export default function CumulativeChart({ data, dividendData, benchmarkData, pri
       })
     }
 
-  }, [parsed, parsedDividend, showDividend, parsedBenchmark, showBenchmark, principal])
+    // ── Tooltip interaction ─────────────────────────────────────────────
+    const overlay = g.select<SVGRectElement>('.hover-overlay')
+      .attr('width', w).attr('height', h)
+    const crosshair = g.select<SVGLineElement>('.crosshair')
+    const hoverDot = g.select<SVGCircleElement>('.hover-dot')
+    const tooltip = tooltipRef.current
+    const bisect = d3.bisector<{ date: Date; value: number }, Date>((d) => d.date).left
+    const startValue = parsed[0]?.value ?? principal
+
+    overlay.on('mousemove', (event: MouseEvent) => {
+      const [mx] = d3.pointer(event)
+      const dateAtMouse = x.invert(mx)
+      let idx = bisect(parsed, dateAtMouse, 1)
+      if (idx >= parsed.length) idx = parsed.length - 1
+      if (idx > 0) {
+        const d0 = parsed[idx - 1], d1 = parsed[idx]
+        if (+dateAtMouse - +d0.date < +d1.date - +dateAtMouse) idx = idx - 1
+      }
+      const pt = parsed[idx]
+      const px = x(pt.date)
+      const py = y(pt.value)
+
+      crosshair.attr('x1', px).attr('x2', px).attr('y1', 0).attr('y2', h).attr('opacity', 1)
+      hoverDot.attr('cx', px).attr('cy', py).attr('opacity', 1)
+
+      if (tooltip) {
+        let html = `<div style="font-size:11px;font-weight:600;margin-bottom:3px">${dateFmt(pt.date)}</div>`
+        html += `<div>${dollarFmt(pt.value)}</div>`
+        html += `<div style="color:${pt.value >= startValue ? '#1D7B45' : '#C0392B'}">${pctFmt(pt.value / startValue - 1)} return</div>`
+        if (showCapital && idx < parsedCapital.length) {
+          html += `<div style="color:${AXIS_TEXT}">${dollarFmt(parsedCapital[idx].value)} invested</div>`
+        }
+        tooltip.innerHTML = html
+        tooltip.style.opacity = '1'
+        // Position: flip if near right edge
+        const tipW = tooltip.offsetWidth
+        const tipH = tooltip.offsetHeight
+        const left = px + MARGIN.left + 12
+        const flipped = left + tipW > W - 8
+        tooltip.style.left = (flipped ? px + MARGIN.left - tipW - 12 : left) + 'px'
+        tooltip.style.top = Math.max(4, py + MARGIN.top - tipH / 2) + 'px'
+      }
+    })
+
+    overlay.on('mouseleave', () => {
+      crosshair.attr('opacity', 0)
+      hoverDot.attr('opacity', 0)
+      if (tooltip) tooltip.style.opacity = '0'
+    })
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [parsed, parsedCapital, showCapital, parsedDividend, showDividend, parsedBenchmark, showBenchmark, principal, fixedYMax, resizeTick])
 
   useEffect(() => {
     const container = containerRef.current
@@ -276,8 +386,20 @@ export default function CumulativeChart({ data, dividendData, benchmarkData, pri
   }
 
   return (
-    <div ref={containerRef} className="w-full h-full">
+    <div ref={containerRef} className="w-full h-full relative">
       <svg ref={svgRef} className="w-full h-full" />
+      <div
+        ref={tooltipRef}
+        style={{
+          position: 'absolute', top: 0, left: 0, opacity: 0,
+          pointerEvents: 'none', transition: 'opacity 0.1s',
+          background: TOOLTIP_BG, border: `1px solid ${TOOLTIP_BORDER}`,
+          borderRadius: 6, padding: '6px 10px',
+          fontFamily: MONO_FONT, fontSize: 11, lineHeight: 1.5,
+          color: TOOLTIP_TEXT, whiteSpace: 'nowrap',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+        }}
+      />
     </div>
   )
 }

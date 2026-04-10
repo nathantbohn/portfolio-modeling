@@ -19,6 +19,11 @@ const AXIS_TEXT = '#7D7168'
 const GRID_LINE = '#E0C9B1'
 const ZERO_COLOR = '#BEB0A3'
 const MONO_FONT = "'JetBrains Mono', ui-monospace, monospace"
+const TOOLTIP_BG = '#FFF1E5'
+const TOOLTIP_BORDER = '#E0C9B1'
+const TOOLTIP_TEXT = '#33302E'
+const dateFmt = d3.timeFormat('%b %Y')
+const pctFmt = (n: number) => (n >= 0 ? '+' : '') + d3.format('.2%')(n)
 
 const WINDOWS: { value: RollingWindow; label: string }[] = [
   { value: 12, label: '1Y' },
@@ -29,8 +34,9 @@ const WINDOWS: { value: RollingWindow; label: string }[] = [
 export default function RollingReturnsChart({ data, window: activeWindow, onWindowChange }: RollingReturnsChartProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const svgRef = useRef<SVGSVGElement>(null)
+  const tooltipRef = useRef<HTMLDivElement>(null)
   const initialized = useRef(false)
-  const [, setResizeTick] = useState(0)
+  const [resizeTick, setResizeTick] = useState(0)
 
   const parsed = useMemo(() => {
     if (data.length === 0) return []
@@ -75,6 +81,19 @@ export default function RollingReturnsChart({ data, window: activeWindow, onWind
       g.append('g').attr('class', 'y-axis')
       g.append('line').attr('class', 'zero-line')
       g.append('path').attr('class', 'line-path')
+
+      // Tooltip overlay elements
+      g.append('line').attr('class', 'crosshair')
+        .attr('stroke', AXIS_TEXT).attr('stroke-width', 1)
+        .attr('stroke-dasharray', '3,3').attr('opacity', 0)
+        .attr('pointer-events', 'none')
+      g.append('circle').attr('class', 'hover-dot')
+        .attr('r', 4).attr('fill', LINE_COLOR).attr('stroke', '#fff')
+        .attr('stroke-width', 1.5).attr('opacity', 0)
+        .attr('pointer-events', 'none')
+      g.append('rect').attr('class', 'hover-overlay')
+        .attr('width', w).attr('height', h)
+        .attr('fill', 'none').attr('pointer-events', 'all')
 
       initialized.current = true
     }
@@ -123,7 +142,53 @@ export default function RollingReturnsChart({ data, window: activeWindow, onWind
       .attr('stroke', LINE_COLOR)
       .attr('stroke-width', 2)
 
-  }, [parsed])
+    // ── Tooltip interaction ─────────────────────────────────────────────
+    const overlay = g.select<SVGRectElement>('.hover-overlay')
+      .attr('width', w).attr('height', h)
+    const crosshair = g.select<SVGLineElement>('.crosshair')
+    const hoverDot = g.select<SVGCircleElement>('.hover-dot')
+    const tooltip = tooltipRef.current
+    const bisect = d3.bisector<{ date: Date; value: number }, Date>((d) => d.date).left
+
+    overlay.on('mousemove', (event: MouseEvent) => {
+      const [mx] = d3.pointer(event)
+      const dateAtMouse = x.invert(mx)
+      let idx = bisect(parsed, dateAtMouse, 1)
+      if (idx >= parsed.length) idx = parsed.length - 1
+      if (idx > 0) {
+        const d0 = parsed[idx - 1], d1 = parsed[idx]
+        if (+dateAtMouse - +d0.date < +d1.date - +dateAtMouse) idx = idx - 1
+      }
+      const pt = parsed[idx]
+      const px = x(pt.date)
+      const py = y(pt.value)
+
+      crosshair.attr('x1', px).attr('x2', px).attr('y1', 0).attr('y2', h).attr('opacity', 1)
+      hoverDot.attr('cx', px).attr('cy', py).attr('opacity', 1)
+
+      if (tooltip) {
+        const color = pt.value >= 0 ? '#1D7B45' : '#C0392B'
+        tooltip.innerHTML =
+          `<div style="font-size:11px;font-weight:600;margin-bottom:3px">${dateFmt(pt.date)}</div>` +
+          `<div style="color:${color}">${pctFmt(pt.value)}</div>`
+        tooltip.style.opacity = '1'
+        const tipW = tooltip.offsetWidth
+        const tipH = tooltip.offsetHeight
+        const left = px + MARGIN.left + 12
+        const flipped = left + tipW > W - 8
+        tooltip.style.left = (flipped ? px + MARGIN.left - tipW - 12 : left) + 'px'
+        tooltip.style.top = Math.max(4, py + MARGIN.top - tipH / 2) + 'px'
+      }
+    })
+
+    overlay.on('mouseleave', () => {
+      crosshair.attr('opacity', 0)
+      hoverDot.attr('opacity', 0)
+      if (tooltip) tooltip.style.opacity = '0'
+    })
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [parsed, resizeTick])
 
   useEffect(() => {
     const container = containerRef.current
@@ -157,13 +222,27 @@ export default function RollingReturnsChart({ data, window: activeWindow, onWind
       </div>
 
       {/* Chart */}
-      <div ref={containerRef} className="flex-1 min-h-0">
+      <div ref={containerRef} className="flex-1 min-h-0 relative">
         {data.length === 0 ? (
           <div className="w-full h-full flex items-center justify-center">
             <p className="text-xs text-warm-300">Not enough data for this window</p>
           </div>
         ) : (
-          <svg ref={svgRef} className="w-full h-full" />
+          <>
+            <svg ref={svgRef} className="w-full h-full" />
+            <div
+              ref={tooltipRef}
+              style={{
+                position: 'absolute', top: 0, left: 0, opacity: 0,
+                pointerEvents: 'none', transition: 'opacity 0.1s',
+                background: TOOLTIP_BG, border: `1px solid ${TOOLTIP_BORDER}`,
+                borderRadius: 6, padding: '6px 10px',
+                fontFamily: MONO_FONT, fontSize: 11, lineHeight: 1.5,
+                color: TOOLTIP_TEXT, whiteSpace: 'nowrap',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+              }}
+            />
+          </>
         )}
       </div>
     </div>

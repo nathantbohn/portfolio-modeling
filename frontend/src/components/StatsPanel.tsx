@@ -54,16 +54,16 @@ export default function StatsPanel({ result, principal }: StatsPanelProps) {
     )
   }
 
-  const { cagr, annualizedVolatility, maxDrawdown, sharpeRatio, cumulativeValues } = result
+  const { cagr, useIRR, totalContributed, annualizedVolatility, maxDrawdown, sharpeRatio, cumulativeValues } = result
   const finalValue = cumulativeValues[cumulativeValues.length - 1]?.value ?? principal
 
   return (
     <div className="grid grid-cols-2 gap-2 h-full content-center">
       <StatCard
-        label="CAGR"
+        label={useIRR ? 'IRR' : 'CAGR'}
         value={fmt(cagr)}
         color={cagr >= 0 ? 'green' : 'red'}
-        sub={fmtDollar(finalValue)}
+        sub={fmtDollar(finalValue) + (useIRR ? ' · ' + fmtDollar(totalContributed) + ' in' : '')}
       />
       <StatCard
         label="Volatility"

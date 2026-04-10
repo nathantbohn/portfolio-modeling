@@ -1,8 +1,7 @@
 import { useMemo, useState, useEffect, useRef } from 'react'
-import { motion, animate } from 'framer-motion'
+import { animate } from 'framer-motion'
 import type { Allocation } from '../types'
 import { FUND_META } from '../types'
-import { CHART_TRANSITION } from '../utils/animations'
 
 interface PieChartProps {
   allocations: Allocation[]
@@ -82,26 +81,22 @@ function WedgePath({ wedge, innerR }: { wedge: Wedge; innerR: number }) {
 
   return (
     <g>
-      <motion.path
+      <path
         d={d}
         fill={wedge.color}
-        initial={false}
-        animate={{ d }}
-        transition={CHART_TRANSITION}
         style={{ filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.1))' }}
       />
       {showLabel && (
-        <motion.text
-          initial={false}
-          animate={{ x: labelPos.x, y: labelPos.y }}
-          transition={CHART_TRANSITION}
+        <text
+          x={labelPos.x}
+          y={labelPos.y}
           textAnchor="middle"
           dominantBaseline="central"
           className="fill-white font-mono text-[10px] font-semibold pointer-events-none select-none"
           style={{ textShadow: '0 1px 3px rgba(0,0,0,0.5)' }}
         >
           {Math.round(wedge.weight)}%
-        </motion.text>
+        </text>
       )}
     </g>
   )

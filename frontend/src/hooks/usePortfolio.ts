@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react'
 import type { Allocation } from '../types'
+import { parseUrlState } from '../utils/urlState'
 
 export const ALL_TICKERS = [
   'VOO', 'BND', 'VXUS', 'SCHD', 'SCHF',
@@ -96,13 +97,17 @@ export interface PortfolioState {
   setUseTotalReturn: (v: boolean) => void
   principal: number
   setPrincipal: (v: number) => void
+  monthlyContribution: number
+  setMonthlyContribution: (v: number) => void
 }
 
 export function usePortfolio(): PortfolioState {
-  const [activeFunds, setActiveFunds] = useState<Allocation[]>(DEFAULT_FUNDS)
-  const [rebalance, setRebalance] = useState(true)
-  const [useTotalReturn, setUseTotalReturn] = useState(true)
-  const [principal, setPrincipal] = useState(10_000)
+  const [urlInit] = useState(() => parseUrlState())
+  const [activeFunds, setActiveFunds] = useState<Allocation[]>(urlInit.funds ?? DEFAULT_FUNDS)
+  const [rebalance, setRebalance] = useState(urlInit.rebalance ?? true)
+  const [useTotalReturn, setUseTotalReturn] = useState(urlInit.totalReturn ?? true)
+  const [principal, setPrincipal] = useState(urlInit.principal ?? 10_000)
+  const [monthlyContribution, setMonthlyContribution] = useState(urlInit.contribute ?? 0)
 
   /** Add a fund at 0% weight. No-op if already active or the portfolio is full. */
   const addFund = useCallback((ticker: string) => {
@@ -149,5 +154,7 @@ export function usePortfolio(): PortfolioState {
     setUseTotalReturn,
     principal,
     setPrincipal,
+    monthlyContribution,
+    setMonthlyContribution,
   }
 }

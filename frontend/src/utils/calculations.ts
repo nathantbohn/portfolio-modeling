@@ -7,6 +7,7 @@ export const RISK_FREE_RATE = 0.02 // 2% annual
 export interface PortfolioConfig {
   rebalance: boolean
   useTotalReturn: boolean
+  monthlyContribution: number
 }
 
 export interface CumulativePoint {
@@ -21,9 +22,12 @@ export interface AnnualReturn {
 
 export interface PortfolioResult {
   cumulativeValues: CumulativePoint[]
+  capitalInvested: CumulativePoint[] // total capital deployed over time (principal + contributions)
   dividendValues: CumulativePoint[] // cumulative dividend income (only populated in price return mode)
   annualReturns: AnnualReturn[]
-  cagr: number
+  cagr: number // time-weighted CAGR when no contributions, money-weighted IRR when contributions active
+  useIRR: boolean // true when CAGR is actually IRR (contributions > 0)
+  totalContributed: number // principal + all contributions
   annualizedVolatility: number
   maxDrawdown: number
   sharpeRatio: number
@@ -86,9 +90,12 @@ export function computePortfolio(
   if (dates.length === 1) {
     return {
       cumulativeValues: [{ date: dates[0], value: initialValue }],
+      capitalInvested: [{ date: dates[0], value: initialValue }],
       dividendValues: config.useTotalReturn ? [] : [{ date: dates[0], value: 0 }],
       annualReturns: [],
       cagr: 0,
+      useIRR: false,
+      totalContributed: initialValue,
       annualizedVolatility: 0,
       maxDrawdown: 0,
       sharpeRatio: 0,
@@ -103,8 +110,15 @@ export function computePortfolio(
     holdings[ticker] = weights[ticker] * initialValue
   }
 
+  const contribution = config.monthlyContribution
+  const hasContributions = contribution > 0
+
   const cumulativeValues: CumulativePoint[] = new Array(n)
   cumulativeValues[0] = { date: dates[0], value: initialValue }
+
+  const capitalInvested: CumulativePoint[] = new Array(n)
+  let totalInvested = initialValue
+  capitalInvested[0] = { date: dates[0], value: totalInvested }
 
   // Track cumulative dividends in price return mode
   const trackDividends = !config.useTotalReturn
@@ -129,6 +143,14 @@ export function computePortfolio(
       for (const { ticker } of active) holdings[ticker] = weights[ticker] * total
     }
 
+    // Monthly contribution: add at start of month before price change
+    if (hasContributions) {
+      for (const { ticker } of active) {
+        holdings[ticker] += weights[ticker] * contribution
+      }
+      totalInvested += contribution
+    }
+
     // Grow each holding by its fund's price ratio, accumulate portfolio total
     let portfolioValue = 0
     for (const { ticker } of active) {
@@ -145,6 +167,7 @@ export function computePortfolio(
     }
 
     cumulativeValues[i] = { date, value: portfolioValue }
+    capitalInvested[i] = { date, value: totalInvested }
     if (trackDividends) {
       dividendValues[i] = { date, value: cumulativeDividend }
     }
@@ -160,19 +183,35 @@ export function computePortfolio(
     monthlyReturns[i - 1] = cumulativeValues[i].value / cumulativeValues[i - 1].value - 1
   }
 
-  // CAGR: date-based year span so leap years are handled correctly
-  const t0 = new Date(dates[0]).getTime()
-  const t1 = new Date(dates[n - 1]).getTime()
-  const years = (t1 - t0) / (365.25 * 24 * 60 * 60 * 1000)
   const finalValue = cumulativeValues[n - 1].value
-  const cagr = years > 0 ? Math.pow(finalValue / initialValue, 1 / years) - 1 : 0
+  const useIRR = hasContributions
+  let cagr: number
+
+  if (useIRR) {
+    // Money-weighted return (IRR) via Newton's method on monthly cashflows
+    const cashflows = new Float64Array(n)
+    cashflows[0] = -initialValue
+    for (let i = 1; i < n - 1; i++) cashflows[i] = -contribution
+    cashflows[n - 1] = -contribution + finalValue // last contribution + terminal value
+    cagr = calcAnnualizedIRR(cashflows)
+  } else {
+    // Time-weighted CAGR
+    const t0 = new Date(dates[0]).getTime()
+    const t1 = new Date(dates[n - 1]).getTime()
+    const years = (t1 - t0) / (365.25 * 24 * 60 * 60 * 1000)
+    cagr = years > 0 ? Math.pow(finalValue / initialValue, 1 / years) - 1 : 0
+  }
 
   const annualizedVolatility = calcAnnualizedVol(monthlyReturns)
   const maxDrawdown = calcMaxDrawdown(cumulativeValues)
   const sharpeRatio = annualizedVolatility > 0 ? (cagr - RISK_FREE_RATE) / annualizedVolatility : 0
   const annualReturns = calcAnnualReturns(cumulativeValues)
 
-  return { cumulativeValues, dividendValues, annualReturns, cagr, annualizedVolatility, maxDrawdown, sharpeRatio }
+  return {
+    cumulativeValues, capitalInvested, dividendValues, annualReturns,
+    cagr, useIRR, totalContributed: totalInvested,
+    annualizedVolatility, maxDrawdown, sharpeRatio,
+  }
 }
 
 // ─── Rolling returns ────────────────────────────────────────────────────────
@@ -205,6 +244,7 @@ export function computeBenchmark(
   useTotalReturn: boolean,
   dates: string[],
   initialValue: number,
+  monthlyContribution: number = 0,
 ): CumulativePoint[] {
   const vooData = priceData['VOO']
   if (!vooData || vooData.length === 0 || dates.length === 0) return []
@@ -222,11 +262,52 @@ export function computeBenchmark(
   let value = initialValue
 
   for (let i = 1; i < validDates.length; i++) {
+    // Add contribution before price change, mirroring portfolio simulation
+    if (monthlyContribution > 0) value += monthlyContribution
     value *= priceMap[validDates[i]] / priceMap[validDates[i - 1]]
     result.push({ date: validDates[i], value })
   }
 
   return result
+}
+
+// ─── Fixed Y-axis bounds ────────────────────────────────────────────────────
+
+export interface ChartBounds {
+  cumulativeMax: number
+  annualReturnMax: number // max absolute annual return across all single-fund sims
+}
+
+/**
+ * Simulate 100% allocation in each available fund to find the extreme Y values.
+ * These become the fixed axis bounds so the chart doesn't rescale on allocation changes.
+ */
+export function computeChartBounds(
+  priceData: PriceData,
+  config: PortfolioConfig,
+  initialValue: number,
+): ChartBounds {
+  const tickers = Object.keys(priceData)
+  let cumulativeMax = initialValue
+  let annualReturnMax = 0.05 // minimum floor
+
+  for (const ticker of tickers) {
+    const result = computePortfolio(
+      [{ ticker, weight: 100 }],
+      priceData,
+      config,
+      initialValue,
+    )
+    for (const pt of result.cumulativeValues) {
+      if (pt.value > cumulativeMax) cumulativeMax = pt.value
+    }
+    for (const ar of result.annualReturns) {
+      const abs = Math.abs(ar.return)
+      if (abs > annualReturnMax) annualReturnMax = abs
+    }
+  }
+
+  return { cumulativeMax, annualReturnMax }
 }
 
 // ─── Internal helpers (exported for testing) ─────────────────────────────────
@@ -295,12 +376,41 @@ export function calcAnnualReturns(values: CumulativePoint[]): AnnualReturn[] {
 
 // ─── Private helpers ──────────────────────────────────────────────────────────
 
+/**
+ * Compute annualized IRR from evenly-spaced monthly cashflows via Newton's method.
+ * cashflows[0] is typically negative (initial investment), last element includes terminal value.
+ * Returns annualized rate: (1 + monthly_irr)^12 - 1.
+ */
+function calcAnnualizedIRR(cashflows: Float64Array, maxIter = 50, tol = 1e-8): number {
+  const n = cashflows.length
+  let r = 0.005 // initial guess: 0.5% monthly
+
+  for (let iter = 0; iter < maxIter; iter++) {
+    let npv = 0
+    let dnpv = 0
+    for (let i = 0; i < n; i++) {
+      const disc = Math.pow(1 + r, i)
+      npv += cashflows[i] / disc
+      dnpv -= i * cashflows[i] / (disc * (1 + r))
+    }
+    if (Math.abs(dnpv) < 1e-15) break
+    const step = npv / dnpv
+    r -= step
+    if (Math.abs(step) < tol) break
+  }
+
+  return Math.pow(1 + r, 12) - 1
+}
+
 function emptyResult(): PortfolioResult {
   return {
     cumulativeValues: [],
+    capitalInvested: [],
     dividendValues: [],
     annualReturns: [],
     cagr: 0,
+    useIRR: false,
+    totalContributed: 0,
     annualizedVolatility: 0,
     maxDrawdown: 0,
     sharpeRatio: 0,
