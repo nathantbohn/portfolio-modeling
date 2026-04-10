@@ -21,6 +21,7 @@ export interface AnnualReturn {
 
 export interface PortfolioResult {
   cumulativeValues: CumulativePoint[]
+  dividendValues: CumulativePoint[] // cumulative dividend income (only populated in price return mode)
   annualReturns: AnnualReturn[]
   cagr: number
   annualizedVolatility: number
@@ -52,12 +53,22 @@ export function computePortfolio(
 
   // Build price lookup: ticker → date → scalar price
   const priceMap: Record<string, Record<string, number>> = {}
+  // When in price return mode, also build adjusted close map for dividend calc
+  const adjMap: Record<string, Record<string, number>> = {}
   for (const { ticker } of active) {
     const map: Record<string, number> = {}
     for (const p of priceData[ticker]) {
       map[p.date] = config.useTotalReturn ? p.adjusted_close : p.close
     }
     priceMap[ticker] = map
+
+    if (!config.useTotalReturn) {
+      const aMap: Record<string, number> = {}
+      for (const p of priceData[ticker]) {
+        aMap[p.date] = p.adjusted_close
+      }
+      adjMap[ticker] = aMap
+    }
   }
 
   // Intersection of dates present in every active ticker, sorted ascending
@@ -75,6 +86,7 @@ export function computePortfolio(
   if (dates.length === 1) {
     return {
       cumulativeValues: [{ date: dates[0], value: initialValue }],
+      dividendValues: config.useTotalReturn ? [] : [{ date: dates[0], value: 0 }],
       annualReturns: [],
       cagr: 0,
       annualizedVolatility: 0,
@@ -94,6 +106,14 @@ export function computePortfolio(
   const cumulativeValues: CumulativePoint[] = new Array(n)
   cumulativeValues[0] = { date: dates[0], value: initialValue }
 
+  // Track cumulative dividends in price return mode
+  const trackDividends = !config.useTotalReturn
+  const dividendValues: CumulativePoint[] = trackDividends ? new Array(n) : []
+  let cumulativeDividend = 0
+  if (trackDividends) {
+    dividendValues[0] = { date: dates[0], value: 0 }
+  }
+
   let prevDate = dates[0]
   let prevYear = dates[0].slice(0, 4)
 
@@ -112,11 +132,22 @@ export function computePortfolio(
     // Grow each holding by its fund's price ratio, accumulate portfolio total
     let portfolioValue = 0
     for (const { ticker } of active) {
-      holdings[ticker] *= priceMap[ticker][date] / priceMap[ticker][prevDate]
+      const priceRatio = priceMap[ticker][date] / priceMap[ticker][prevDate]
+
+      // Dividend income = difference between total return and price return, applied to holdings
+      if (trackDividends) {
+        const adjRatio = adjMap[ticker][date] / adjMap[ticker][prevDate]
+        cumulativeDividend += holdings[ticker] * (adjRatio - priceRatio)
+      }
+
+      holdings[ticker] *= priceRatio
       portfolioValue += holdings[ticker]
     }
 
     cumulativeValues[i] = { date, value: portfolioValue }
+    if (trackDividends) {
+      dividendValues[i] = { date, value: cumulativeDividend }
+    }
     prevDate = date
     prevYear = year
   }
@@ -141,7 +172,61 @@ export function computePortfolio(
   const sharpeRatio = annualizedVolatility > 0 ? (cagr - RISK_FREE_RATE) / annualizedVolatility : 0
   const annualReturns = calcAnnualReturns(cumulativeValues)
 
-  return { cumulativeValues, annualReturns, cagr, annualizedVolatility, maxDrawdown, sharpeRatio }
+  return { cumulativeValues, dividendValues, annualReturns, cagr, annualizedVolatility, maxDrawdown, sharpeRatio }
+}
+
+// ─── Rolling returns ────────────────────────────────────────────────────────
+
+export interface RollingReturnPoint {
+  date: string
+  return: number // e.g. 0.12 = 12%
+}
+
+/** Trailing rolling return over `months` months from cumulative values (monthly data). */
+export function calcRollingReturns(
+  values: CumulativePoint[],
+  months: number,
+): RollingReturnPoint[] {
+  if (values.length <= months) return []
+  const result: RollingReturnPoint[] = new Array(values.length - months)
+  for (let i = months; i < values.length; i++) {
+    result[i - months] = {
+      date: values[i].date,
+      return: values[i].value / values[i - months].value - 1,
+    }
+  }
+  return result
+}
+
+// ─── Benchmark (100% VOO) ───────────────────────────────────────────────────
+
+export function computeBenchmark(
+  priceData: PriceData,
+  useTotalReturn: boolean,
+  dates: string[],
+  initialValue: number,
+): CumulativePoint[] {
+  const vooData = priceData['VOO']
+  if (!vooData || vooData.length === 0 || dates.length === 0) return []
+
+  const priceMap: Record<string, number> = {}
+  for (const p of vooData) {
+    priceMap[p.date] = useTotalReturn ? p.adjusted_close : p.close
+  }
+
+  // Filter to dates that exist in VOO data
+  const validDates = dates.filter((d) => d in priceMap)
+  if (validDates.length === 0) return []
+
+  const result: CumulativePoint[] = [{ date: validDates[0], value: initialValue }]
+  let value = initialValue
+
+  for (let i = 1; i < validDates.length; i++) {
+    value *= priceMap[validDates[i]] / priceMap[validDates[i - 1]]
+    result.push({ date: validDates[i], value })
+  }
+
+  return result
 }
 
 // ─── Internal helpers (exported for testing) ─────────────────────────────────
@@ -213,6 +298,7 @@ export function calcAnnualReturns(values: CumulativePoint[]): AnnualReturn[] {
 function emptyResult(): PortfolioResult {
   return {
     cumulativeValues: [],
+    dividendValues: [],
     annualReturns: [],
     cagr: 0,
     annualizedVolatility: 0,

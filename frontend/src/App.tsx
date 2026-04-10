@@ -1,8 +1,8 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { DragDropContext, type DropResult } from '@hello-pangea/dnd'
 import { usePortfolio } from './hooks/usePortfolio'
 import { usePriceData } from './hooks/usePriceData'
-import { computePortfolio } from './utils/calculations'
+import { computePortfolio, computeBenchmark, calcRollingReturns } from './utils/calculations'
 import FundTray from './components/FundTray'
 import AllocationPanel from './components/AllocationPanel'
 import ToggleSwitch from './components/ToggleSwitch'
@@ -10,6 +10,7 @@ import PieChart from './components/PieChart'
 import StatsPanel from './components/StatsPanel'
 import CumulativeChart from './components/CumulativeChart'
 import AnnualReturnsChart from './components/AnnualReturnsChart'
+import RollingReturnsChart from './components/RollingReturnsChart'
 
 export default function App() {
   const {
@@ -27,6 +28,9 @@ export default function App() {
 
   const { data: priceData, loading, error } = usePriceData()
 
+  const [showBenchmark, setShowBenchmark] = useState(false)
+  const [rollingWindow, setRollingWindow] = useState<12 | 36 | 60>(12)
+
   const activeTickers = new Set(activeFunds.map((f) => f.ticker))
   const isFull = activeFunds.length >= 4
 
@@ -39,6 +43,17 @@ export default function App() {
       principal,
     )
   }, [activeFunds, priceData, rebalance, useTotalReturn, principal])
+
+  const rollingData = useMemo(() => {
+    if (!result) return []
+    return calcRollingReturns(result.cumulativeValues, rollingWindow)
+  }, [result, rollingWindow])
+
+  const benchmarkData = useMemo(() => {
+    if (!showBenchmark || !priceData || !result || result.cumulativeValues.length === 0) return []
+    const dates = result.cumulativeValues.map((p) => p.date)
+    return computeBenchmark(priceData, useTotalReturn, dates, principal)
+  }, [showBenchmark, priceData, result, useTotalReturn, principal])
 
   function onDragEnd(r: DropResult) {
     const { destination, draggableId } = r
@@ -88,6 +103,12 @@ export default function App() {
                   checked={rebalance}
                   onChange={setRebalance}
                   label="Rebalance"
+                />
+                <div className="w-px h-3.5 bg-border" />
+                <ToggleSwitch
+                  checked={showBenchmark}
+                  onChange={setShowBenchmark}
+                  label="Benchmark"
                 />
               </div>
 
@@ -140,6 +161,8 @@ export default function App() {
             <div className="flex-1 min-h-[180px] rounded-lg border border-border overflow-hidden">
               <CumulativeChart
                 data={result?.cumulativeValues ?? []}
+                dividendData={result?.dividendValues ?? []}
+                benchmarkData={benchmarkData}
                 principal={principal}
               />
             </div>
@@ -147,6 +170,15 @@ export default function App() {
             {/* Annual returns bar chart */}
             <div className="flex-shrink-0 rounded-lg border border-border overflow-hidden" style={{ height: '180px' }}>
               <AnnualReturnsChart data={result?.annualReturns ?? []} />
+            </div>
+
+            {/* Rolling returns chart */}
+            <div className="flex-shrink-0 rounded-lg border border-border overflow-hidden" style={{ height: '200px' }}>
+              <RollingReturnsChart
+                data={rollingData}
+                window={rollingWindow}
+                onWindowChange={setRollingWindow}
+              />
             </div>
           </main>
         </div>
