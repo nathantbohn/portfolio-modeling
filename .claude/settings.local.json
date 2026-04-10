@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc:*)",
+      "Bash(echo \"Exit: $?\")",
+      "Bash(npx vite:*)",
+      "Bash(pkill -f \"vite\")",
+      "Bash(npm run:*)"
+    ]
+  }
+}

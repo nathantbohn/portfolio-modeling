@@ -1,0 +1,156 @@
+import { useRef, useEffect, useMemo, useState } from 'react'
+import * as d3 from 'd3'
+import type { CumulativePoint } from '../utils/calculations'
+
+interface CumulativeChartProps {
+  data: CumulativePoint[]
+  principal: number
+}
+
+const MARGIN = { top: 20, right: 24, bottom: 32, left: 64 }
+const EASE = d3.easeCubicOut
+const DURATION = 200
+
+const ACCENT = '#990F3D'
+const AXIS_TEXT = '#7D7168'
+const GRID_LINE = '#E0C9B1'
+const BASELINE_COLOR = '#BEB0A3'
+const MONO_FONT = "'JetBrains Mono', ui-monospace, monospace"
+
+export default function CumulativeChart({ data, principal }: CumulativeChartProps) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const svgRef = useRef<SVGSVGElement>(null)
+  const initialized = useRef(false)
+  const [, setResizeTick] = useState(0)
+
+  const parsed = useMemo(() => {
+    if (data.length === 0) return []
+    return data.map((d) => ({ date: new Date(d.date), value: d.value }))
+  }, [data])
+
+  useEffect(() => {
+    const container = containerRef.current
+    const svg = svgRef.current
+    if (!container || !svg) return
+
+    const { width: W, height: H } = container.getBoundingClientRect()
+    if (W === 0 || H === 0) return
+
+    const w = W - MARGIN.left - MARGIN.right
+    const h = H - MARGIN.top - MARGIN.bottom
+
+    const sel = d3.select(svg).attr('width', W).attr('height', H)
+
+    const xExtent = d3.extent(parsed, (d) => d.date) as [Date, Date]
+    const yMax = d3.max(parsed, (d) => d.value) ?? principal
+    const yMin = Math.min(d3.min(parsed, (d) => d.value) ?? principal, principal)
+
+    const x = d3.scaleTime().domain(xExtent).range([0, w])
+    const y = d3.scaleLinear().domain([yMin * 0.95, yMax * 1.05]).nice().range([h, 0])
+
+    const line = d3
+      .line<{ date: Date; value: number }>()
+      .x((d) => x(d.date))
+      .y((d) => y(d.value))
+      .curve(d3.curveMonotoneX)
+
+    const area = d3
+      .area<{ date: Date; value: number }>()
+      .x((d) => x(d.date))
+      .y0(h)
+      .y1((d) => y(d.value))
+      .curve(d3.curveMonotoneX)
+
+    if (!initialized.current) {
+      sel.selectAll('*').remove()
+
+      const defs = sel.append('defs')
+      const grad = defs
+        .append('linearGradient')
+        .attr('id', 'area-grad')
+        .attr('x1', '0')
+        .attr('x2', '0')
+        .attr('y1', '0')
+        .attr('y2', '1')
+      grad.append('stop').attr('offset', '0%').attr('stop-color', ACCENT).attr('stop-opacity', 0.15)
+      grad.append('stop').attr('offset', '100%').attr('stop-color', ACCENT).attr('stop-opacity', 0.02)
+
+      const g = sel.append('g').attr('transform', `translate(${MARGIN.left},${MARGIN.top})`).attr('class', 'chart-g')
+
+      g.append('g').attr('class', 'x-axis').attr('transform', `translate(0,${h})`)
+      g.append('g').attr('class', 'y-axis')
+      g.append('line').attr('class', 'baseline')
+      g.append('path').attr('class', 'area-path')
+      g.append('path').attr('class', 'line-path')
+
+      initialized.current = true
+    }
+
+    const g = sel.select<SVGGElement>('.chart-g')
+
+    const xAxis = d3.axisBottom(x).ticks(Math.min(parsed.length, 8)).tickFormat(d3.timeFormat('%Y') as any).tickSize(0).tickPadding(8)
+    const yAxis = d3.axisLeft(y).ticks(5).tickFormat((d) => `$${d3.format(',.0f')(d as number)}`).tickSize(-w).tickPadding(8)
+
+    g.select<SVGGElement>('.x-axis')
+      .transition().duration(DURATION).ease(EASE)
+      .call(xAxis)
+      .call((g) => g.select('.domain').remove())
+      .call((g) => g.selectAll('.tick text').attr('fill', AXIS_TEXT).attr('font-size', '9px').attr('font-family', MONO_FONT))
+      .call((g) => g.selectAll('.tick line').remove())
+
+    g.select<SVGGElement>('.y-axis')
+      .transition().duration(DURATION).ease(EASE)
+      .call(yAxis)
+      .call((g) => g.select('.domain').remove())
+      .call((g) => g.selectAll('.tick text').attr('fill', AXIS_TEXT).attr('font-size', '10px').attr('font-family', MONO_FONT))
+      .call((g) => g.selectAll('.tick line').attr('stroke', GRID_LINE).attr('stroke-opacity', 0.4).attr('stroke-dasharray', '2,3'))
+
+    g.select('.baseline')
+      .transition().duration(DURATION).ease(EASE)
+      .attr('x1', 0).attr('x2', w)
+      .attr('y1', y(principal)).attr('y2', y(principal))
+      .attr('stroke', BASELINE_COLOR)
+      .attr('stroke-dasharray', '6,4')
+      .attr('stroke-width', 1)
+
+    g.select('.area-path')
+      .datum(parsed)
+      .transition().duration(DURATION).ease(EASE)
+      .attr('d', area)
+      .attr('fill', 'url(#area-grad)')
+
+    g.select('.line-path')
+      .datum(parsed)
+      .transition().duration(DURATION).ease(EASE)
+      .attr('d', line)
+      .attr('fill', 'none')
+      .attr('stroke', ACCENT)
+      .attr('stroke-width', 2)
+
+  }, [parsed, principal])
+
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+    const ro = new ResizeObserver(() => {
+      initialized.current = false
+      setResizeTick((t) => t + 1)
+    })
+    ro.observe(container)
+    return () => ro.disconnect()
+  }, [])
+
+  if (data.length === 0) {
+    return (
+      <div ref={containerRef} className="w-full h-full flex items-center justify-center">
+        <p className="text-xs text-warm-300">No data</p>
+      </div>
+    )
+  }
+
+  return (
+    <div ref={containerRef} className="w-full h-full">
+      <svg ref={svgRef} className="w-full h-full" />
+    </div>
+  )
+}
