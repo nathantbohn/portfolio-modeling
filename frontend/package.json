@@ -12,11 +12,11 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0",
-    "framer-motion": "^12.6.3",
+    "@hello-pangea/dnd": "^18.0.1",
     "d3": "^7.9.0",
-    "@hello-pangea/dnd": "^16.6.0"
+    "framer-motion": "^12.6.3",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
   },
   "devDependencies": {
     "@types/d3": "^7.4.3",
