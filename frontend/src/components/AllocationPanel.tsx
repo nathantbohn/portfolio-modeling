@@ -1,4 +1,4 @@
-import { Droppable } from '@hello-pangea/dnd'
+import { useDroppable } from '@dnd-kit/core'
 import type { Allocation } from '../types'
 import PortfolioSlot from './PortfolioSlot'
 
@@ -11,6 +11,8 @@ interface AllocationPanelProps {
 export default function AllocationPanel({ activeFunds, onSetWeight, onRemove }: AllocationPanelProps) {
   const total = activeFunds.reduce((s, f) => s + f.weight, 0)
   const sumOk = Math.abs(total - 100) < 0.01
+
+  const { isOver, setNodeRef } = useDroppable({ id: 'portfolio' })
 
   return (
     <div>
@@ -29,40 +31,34 @@ export default function AllocationPanel({ activeFunds, onSetWeight, onRemove }: 
         </div>
       </div>
 
-      <Droppable droppableId="portfolio">
-        {(provided, snapshot) => (
-          <div
-            ref={provided.innerRef}
-            {...provided.droppableProps}
-            className={[
-              'p-2 transition-colors duration-200',
-              snapshot.isDraggingOver ? 'bg-surface-2/50' : '',
-            ].join(' ')}
-          >
-            {activeFunds.length === 0 ? (
-              <div className="py-6 flex items-center justify-center">
-                <div className="text-center">
-                  <p className="text-warm-200 text-xs">Drag funds here</p>
-                  <p className="text-warm-300 text-[11px] mt-0.5">Up to 4 funds</p>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-1.5">
-                {activeFunds.map((fund) => (
-                  <PortfolioSlot
-                    key={fund.ticker}
-                    fund={fund}
-                    onSetWeight={onSetWeight}
-                    onRemove={onRemove}
-                    canRemove={activeFunds.length > 1}
-                  />
-                ))}
-              </div>
-            )}
-            {provided.placeholder}
+      <div
+        ref={setNodeRef}
+        className={[
+          'p-2 transition-colors duration-200',
+          isOver ? 'bg-surface-2/50' : '',
+        ].join(' ')}
+      >
+        {activeFunds.length === 0 ? (
+          <div className="py-6 flex items-center justify-center">
+            <div className="text-center">
+              <p className="text-warm-200 text-xs">Drag funds here</p>
+              <p className="text-warm-300 text-[11px] mt-0.5">Up to 4 funds</p>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            {activeFunds.map((fund) => (
+              <PortfolioSlot
+                key={fund.ticker}
+                fund={fund}
+                onSetWeight={onSetWeight}
+                onRemove={onRemove}
+                canRemove={activeFunds.length > 1}
+              />
+            ))}
           </div>
         )}
-      </Droppable>
+      </div>
     </div>
   )
 }

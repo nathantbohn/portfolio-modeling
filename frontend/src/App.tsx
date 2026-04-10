@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
-import { DragDropContext, type DropResult } from '@hello-pangea/dnd'
+import { DndContext, type DragEndEvent } from '@dnd-kit/core'
 import { usePortfolio } from './hooks/usePortfolio'
 import { usePriceData } from './hooks/usePriceData'
 import { computePortfolio, computeBenchmark, calcRollingReturns, computeChartBounds } from './utils/calculations'
@@ -86,16 +86,15 @@ export default function App() {
     return computeBenchmark(priceData, useTotalReturn, dates, principal, monthlyContribution)
   }, [showBenchmark, priceData, result, useTotalReturn, principal, monthlyContribution])
 
-  function onDragEnd(r: DropResult) {
-    const { destination, draggableId } = r
-    if (!destination) return
-    if (destination.droppableId === 'portfolio') {
-      addFund(draggableId)
+  function onDragEnd(event: DragEndEvent) {
+    const { over, active } = event
+    if (over?.id === 'portfolio') {
+      addFund(String(active.id))
     }
   }
 
   return (
-    <DragDropContext onDragEnd={onDragEnd}>
+    <DndContext onDragEnd={onDragEnd}>
       <div className="h-screen flex flex-col bg-surface-0 text-warm-50 overflow-hidden">
 
         {/* ── Header ────────────────────────────────────────────────── */}
@@ -245,6 +244,6 @@ export default function App() {
           </main>
         </div>
       </div>
-    </DragDropContext>
+    </DndContext>
   )
 }
