@@ -6,13 +6,14 @@ interface PortfolioSlotProps {
   fund: Allocation
   onSetWeight: (ticker: string, weight: number) => void
   onRemove: (ticker: string) => void
+  onToggleLock: (ticker: string) => void
   canRemove: boolean
 }
 
-export default function PortfolioSlot({ fund, onSetWeight, onRemove, canRemove }: PortfolioSlotProps) {
+export default function PortfolioSlot({ fund, onSetWeight, onRemove, onToggleLock, canRemove }: PortfolioSlotProps) {
   const meta = FUND_META[fund.ticker] ?? { name: fund.ticker, color: '#990F3D' }
   const { color, name } = meta
-  const { ticker, weight } = fund
+  const { ticker, weight, locked } = fund
 
   const sliderStyle: CSSProperties = {
     '--track-fill': color,
@@ -20,7 +21,10 @@ export default function PortfolioSlot({ fund, onSetWeight, onRemove, canRemove }
   } as CSSProperties
 
   return (
-    <div className="relative rounded-md bg-surface-1 border border-border p-2.5 hover:border-warm-400 transition-colors duration-150">
+    <div className={[
+      'relative rounded-md bg-surface-1 border border-border p-2.5 transition-colors duration-150',
+      locked ? 'opacity-60' : 'hover:border-warm-400',
+    ].join(' ')}>
       <div
         className="absolute left-0 top-2 bottom-2 w-[3px] rounded-full"
         style={{ backgroundColor: color }}
@@ -39,22 +43,47 @@ export default function PortfolioSlot({ fund, onSetWeight, onRemove, canRemove }
             <span className="text-[10px] text-warm-200 truncate">{name}</span>
           </div>
 
-          <button
-            onClick={() => onRemove(ticker)}
-            disabled={!canRemove}
-            className="text-warm-300 hover:text-warm-50 disabled:opacity-20 disabled:cursor-not-allowed transition-colors p-0.5 rounded hover:bg-surface-2 flex-shrink-0 ml-1"
-            aria-label={`Remove ${ticker}`}
-            type="button"
-          >
-            <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
-              <path
-                d="M2 2l8 8M10 2L2 10"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-              />
-            </svg>
-          </button>
+          <div className="flex items-center gap-0.5 flex-shrink-0 ml-1">
+            <button
+              onClick={() => onToggleLock(ticker)}
+              className={[
+                'transition-colors p-0.5 rounded flex-shrink-0',
+                locked
+                  ? 'text-warm-100 hover:text-warm-50'
+                  : 'text-warm-400 hover:text-warm-200 hover:bg-surface-2',
+              ].join(' ')}
+              aria-label={locked ? `Unlock ${ticker}` : `Lock ${ticker}`}
+              type="button"
+            >
+              {locked ? (
+                <svg width="11" height="11" viewBox="0 0 16 16" fill="none">
+                  <rect x="3" y="7" width="10" height="7" rx="1.5" fill="currentColor" />
+                  <path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+              ) : (
+                <svg width="11" height="11" viewBox="0 0 16 16" fill="none">
+                  <rect x="3" y="7" width="10" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.3" />
+                  <path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                </svg>
+              )}
+            </button>
+            <button
+              onClick={() => onRemove(ticker)}
+              disabled={!canRemove}
+              className="text-warm-300 hover:text-warm-50 disabled:opacity-20 disabled:cursor-not-allowed transition-colors p-0.5 rounded hover:bg-surface-2 flex-shrink-0"
+              aria-label={`Remove ${ticker}`}
+              type="button"
+            >
+              <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+                <path
+                  d="M2 2l8 8M10 2L2 10"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* Slider + input in one row */}
@@ -66,6 +95,7 @@ export default function PortfolioSlot({ fund, onSetWeight, onRemove, canRemove }
             max={100}
             step={0.1}
             value={weight}
+            disabled={locked}
             onChange={(e) => onSetWeight(ticker, parseFloat(e.target.value))}
             style={sliderStyle}
           />
@@ -76,11 +106,12 @@ export default function PortfolioSlot({ fund, onSetWeight, onRemove, canRemove }
               max={100}
               step={0.1}
               value={weight.toFixed(1)}
+              disabled={locked}
               onChange={(e) => {
                 const v = parseFloat(e.target.value)
                 if (!isNaN(v)) onSetWeight(ticker, v)
               }}
-              className="w-[52px] bg-surface-1 border border-border rounded px-1.5 py-0.5 text-[11px] font-mono text-warm-50 text-right tabular-nums focus:outline-none focus:border-warm-300 transition-colors"
+              className="w-[52px] bg-surface-1 border border-border rounded px-1.5 py-0.5 text-[11px] font-mono text-warm-50 text-right tabular-nums focus:outline-none focus:border-warm-300 transition-colors disabled:opacity-50"
             />
             <span className="text-warm-300 text-[11px]">%</span>
           </div>

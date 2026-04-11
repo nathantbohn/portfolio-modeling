@@ -20,6 +20,7 @@ export const FUND_META: Record<string, { name: string; color: string }> = {
 export interface Allocation {
   ticker: string
   weight: number // 0–100
+  locked?: boolean
 }
 
 export interface PricePoint {

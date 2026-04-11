@@ -1,22 +1,24 @@
 import { FUND_META, type Allocation } from '../types'
+import type { RebalanceFrequency } from './calculations'
 
 /**
  * URL format:
  *   ?funds=VOO:60,BND:40&principal=10000&contribute=500
- *    &rebalance=true&totalReturn=true&benchmark=false&rolling=12
+ *    &rebalance=annual&totalReturn=true&benchmark=false&rolling=12
  */
 
 export interface UrlState {
   funds?: Allocation[]
   principal?: number
   contribute?: number
-  rebalance?: boolean
+  rebalanceFrequency?: RebalanceFrequency
   totalReturn?: boolean
   benchmark?: boolean
   rolling?: 12 | 36 | 60
 }
 
 const validTickers = new Set<string>(Object.keys(FUND_META))
+const VALID_REBALANCE = new Set<string>(['none', 'monthly', 'quarterly', 'semi-annual', 'annual'])
 
 export function parseUrlState(): UrlState {
   const params = new URLSearchParams(window.location.search)
@@ -50,7 +52,12 @@ export function parseUrlState(): UrlState {
   }
 
   const rebalance = params.get('rebalance')
-  if (rebalance != null) state.rebalance = rebalance !== 'false'
+  if (rebalance != null) {
+    // Backwards compat: "true" → annual, "false" → none
+    if (rebalance === 'true') state.rebalanceFrequency = 'annual'
+    else if (rebalance === 'false') state.rebalanceFrequency = 'none'
+    else if (VALID_REBALANCE.has(rebalance)) state.rebalanceFrequency = rebalance as RebalanceFrequency
+  }
 
   const totalReturn = params.get('totalReturn')
   if (totalReturn != null) state.totalReturn = totalReturn !== 'false'
@@ -71,7 +78,7 @@ export function buildShareUrl(state: {
   funds: Allocation[]
   principal: number
   contribute: number
-  rebalance: boolean
+  rebalanceFrequency: RebalanceFrequency
   totalReturn: boolean
   benchmark: boolean
   rolling: 12 | 36 | 60
@@ -86,7 +93,7 @@ export function buildShareUrl(state: {
   params.set('principal', String(state.principal))
 
   if (state.contribute > 0) params.set('contribute', String(state.contribute))
-  if (!state.rebalance) params.set('rebalance', 'false')
+  if (state.rebalanceFrequency !== 'annual') params.set('rebalance', state.rebalanceFrequency)
   if (!state.totalReturn) params.set('totalReturn', 'false')
   if (state.benchmark) params.set('benchmark', 'true')
   if (state.rolling !== 12) params.set('rolling', String(state.rolling))

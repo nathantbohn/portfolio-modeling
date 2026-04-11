@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react'
 import type { Allocation } from '../types'
+import type { RebalanceFrequency } from '../utils/calculations'
 import { parseUrlState } from '../utils/urlState'
 
 export const ALL_TICKERS = [
@@ -39,49 +40,60 @@ export function applyWeightChange(
   const idx = funds.findIndex((f) => f.ticker === ticker)
   if (idx === -1) return funds
 
-  const others = funds.filter((f) => f.ticker !== ticker)
-  const othersTotal = others.reduce((s, f) => s + f.weight, 0)
+  // Locked funds keep their weight; only unlocked others absorb the delta
+  const lockedTotal = funds
+    .filter((f) => f.ticker !== ticker && f.locked)
+    .reduce((s, f) => s + f.weight, 0)
 
-  // Edge case A: all other funds are already at 0% — distribute evenly.
-  if (othersTotal === 0) {
-    const each = others.length > 0 ? (100 - newWeight) / others.length : 0
-    return funds.map((f) =>
-      f.ticker === ticker ? { ...f, weight: newWeight } : { ...f, weight: each },
-    )
+  // Cap so locked + new never exceeds 100
+  const cappedWeight = Math.min(newWeight, 100 - lockedTotal)
+
+  const unlocked = funds.filter((f) => f.ticker !== ticker && !f.locked)
+  const unlockedTotal = unlocked.reduce((s, f) => s + f.weight, 0)
+  const remainder = 100 - cappedWeight - lockedTotal
+
+  // Edge case A: all unlocked others at 0% — distribute evenly.
+  if (unlockedTotal === 0) {
+    const each = unlocked.length > 0 ? remainder / unlocked.length : 0
+    return funds.map((f) => {
+      if (f.ticker === ticker) return { ...f, weight: cappedWeight }
+      if (f.locked) return f
+      return { ...f, weight: each }
+    })
   }
 
-  const delta = newWeight - funds[idx].weight
+  const delta = cappedWeight - funds[idx].weight
 
-  // Proportional absorption of delta by each other fund.
-  const adjusted = others.map((f) => ({
+  // Proportional absorption among unlocked others
+  const adjusted = unlocked.map((f) => ({
     ...f,
-    weight: Math.max(0, f.weight - delta * (f.weight / othersTotal)),
+    weight: Math.max(0, f.weight - delta * (f.weight / unlockedTotal)),
   }))
 
   const adjTotal = adjusted.reduce((s, f) => s + f.weight, 0)
 
-  // Edge case B: all others clamped to 0 after adjustment — distribute evenly.
+  // Edge case B: all unlocked others clamped to 0 — distribute evenly.
   if (adjTotal === 0) {
-    const each = others.length > 0 ? (100 - newWeight) / others.length : 0
+    const each = unlocked.length > 0 ? remainder / unlocked.length : 0
     const evenMap: Record<string, number> = {}
-    for (const f of others) evenMap[f.ticker] = each
-    return funds.map((f) =>
-      f.ticker === ticker
-        ? { ...f, weight: newWeight }
-        : { ...f, weight: evenMap[f.ticker] },
-    )
+    for (const f of unlocked) evenMap[f.ticker] = each
+    return funds.map((f) => {
+      if (f.ticker === ticker) return { ...f, weight: cappedWeight }
+      if (f.locked) return f
+      return { ...f, weight: evenMap[f.ticker] }
+    })
   }
 
-  // Normalise so others sum to exactly (100 – newWeight).
-  const scale = (100 - newWeight) / adjTotal
+  // Normalise so unlocked others sum to remainder.
+  const scale = remainder / adjTotal
   const scaledMap: Record<string, number> = {}
   for (const f of adjusted) scaledMap[f.ticker] = f.weight * scale
 
-  return funds.map((f) =>
-    f.ticker === ticker
-      ? { ...f, weight: newWeight }
-      : { ...f, weight: scaledMap[f.ticker] },
-  )
+  return funds.map((f) => {
+    if (f.ticker === ticker) return { ...f, weight: cappedWeight }
+    if (f.locked) return f
+    return { ...f, weight: scaledMap[f.ticker] }
+  })
 }
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
@@ -92,8 +104,9 @@ export interface PortfolioState {
   addFund: (ticker: string) => void
   removeFund: (ticker: string) => void
   setWeight: (ticker: string, weight: number) => void
-  rebalance: boolean
-  setRebalance: (v: boolean) => void
+  toggleLock: (ticker: string) => void
+  rebalanceFrequency: RebalanceFrequency
+  setRebalanceFrequency: (v: RebalanceFrequency) => void
   useTotalReturn: boolean
   setUseTotalReturn: (v: boolean) => void
   principal: number
@@ -105,7 +118,7 @@ export interface PortfolioState {
 export function usePortfolio(): PortfolioState {
   const [urlInit] = useState(() => parseUrlState())
   const [activeFunds, setActiveFunds] = useState<Allocation[]>(urlInit.funds ?? DEFAULT_FUNDS)
-  const [rebalance, setRebalance] = useState(urlInit.rebalance ?? true)
+  const [rebalanceFrequency, setRebalanceFrequency] = useState<RebalanceFrequency>(urlInit.rebalanceFrequency ?? 'annual')
   const [useTotalReturn, setUseTotalReturn] = useState(urlInit.totalReturn ?? true)
   const [principal, setPrincipal] = useState(urlInit.principal ?? 10_000)
   const [monthlyContribution, setMonthlyContribution] = useState(urlInit.contribute ?? 0)
@@ -120,8 +133,8 @@ export function usePortfolio(): PortfolioState {
   }, [])
 
   /**
-   * Remove a fund. Its weight is distributed EVENLY across the remaining funds.
-   * No-op if the fund is not active or it's the only fund.
+   * Remove a fund. Its weight is distributed among unlocked remaining funds
+   * (evenly if all unlocked are at 0%, proportionally otherwise).
    */
   const removeFund = useCallback((ticker: string) => {
     setActiveFunds((prev) => {
@@ -129,10 +142,40 @@ export function usePortfolio(): PortfolioState {
       if (!target) return prev
 
       const rest = prev.filter((f) => f.ticker !== ticker)
-      if (rest.length === 0) return prev // can't remove the last fund
+      if (rest.length === 0) return prev
 
-      const share = target.weight / rest.length
-      return rest.map((f) => ({ ...f, weight: f.weight + share }))
+      const unlocked = rest.filter((f) => !f.locked)
+      if (unlocked.length === 0) {
+        // All remaining are locked — distribute evenly anyway
+        const share = target.weight / rest.length
+        return rest.map((f) => ({ ...f, weight: f.weight + share }))
+      }
+
+      const share = target.weight / unlocked.length
+      const unlockedSet = new Set(unlocked.map((f) => f.ticker))
+      return rest.map((f) =>
+        unlockedSet.has(f.ticker) ? { ...f, weight: f.weight + share } : f,
+      )
+    })
+  }, [])
+
+  /** Toggle lock on a fund. Prevents locking if locked total would reach 100%. */
+  const toggleLock = useCallback((ticker: string) => {
+    setActiveFunds((prev) => {
+      const fund = prev.find((f) => f.ticker === ticker)
+      if (!fund) return prev
+
+      if (!fund.locked) {
+        // Check if locking would leave no room for unlocked funds
+        const lockedTotal = prev
+          .filter((f) => f.locked)
+          .reduce((s, f) => s + f.weight, 0)
+        if (lockedTotal + fund.weight >= 100) return prev
+      }
+
+      return prev.map((f) =>
+        f.ticker === ticker ? { ...f, locked: !f.locked } : f,
+      )
     })
   }, [])
 
@@ -150,8 +193,9 @@ export function usePortfolio(): PortfolioState {
     addFund,
     removeFund,
     setWeight,
-    rebalance,
-    setRebalance,
+    toggleLock,
+    rebalanceFrequency,
+    setRebalanceFrequency,
     useTotalReturn,
     setUseTotalReturn,
     principal,

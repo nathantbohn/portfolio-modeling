@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react'
 import { DndContext, type DragEndEvent } from '@dnd-kit/core'
 import { usePortfolio } from './hooks/usePortfolio'
 import { usePriceData } from './hooks/usePriceData'
-import { computePortfolio, computeBenchmark, calcRollingReturns, computeChartBounds } from './utils/calculations'
+import { computePortfolio, computeBenchmark, calcRollingReturns, computeChartBounds, type RebalanceFrequency } from './utils/calculations'
 import FundTray from './components/FundTray'
 import AllocationPanel from './components/AllocationPanel'
 import ToggleSwitch from './components/ToggleSwitch'
@@ -22,8 +22,9 @@ export default function App() {
     addFund,
     removeFund,
     setWeight,
-    rebalance,
-    setRebalance,
+    toggleLock,
+    rebalanceFrequency,
+    setRebalanceFrequency,
     useTotalReturn,
     setUseTotalReturn,
     principal,
@@ -38,13 +39,16 @@ export default function App() {
   const [showBenchmark, setShowBenchmark] = useState(urlInit.benchmark ?? false)
   const [rollingWindow, setRollingWindow] = useState<12 | 36 | 60>(urlInit.rolling ?? 12)
   const [copied, setCopied] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try { return localStorage.getItem('sidebar-collapsed') === 'true' } catch { return false }
+  })
 
   const handleShare = useCallback(() => {
     const url = buildShareUrl({
       funds: activeFunds,
       principal,
       contribute: monthlyContribution,
-      rebalance,
+      rebalanceFrequency,
       totalReturn: useTotalReturn,
       benchmark: showBenchmark,
       rolling: rollingWindow,
@@ -53,7 +57,7 @@ export default function App() {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     })
-  }, [activeFunds, principal, monthlyContribution, rebalance, useTotalReturn, showBenchmark, rollingWindow])
+  }, [activeFunds, principal, monthlyContribution, rebalanceFrequency, useTotalReturn, showBenchmark, rollingWindow])
 
   const activeTickers = new Set(activeFunds.map((f) => f.ticker))
   const isFull = activeFunds.length >= 4
@@ -63,19 +67,19 @@ export default function App() {
     return computePortfolio(
       activeFunds,
       priceData,
-      { rebalance, useTotalReturn, monthlyContribution },
+      { rebalanceFrequency, useTotalReturn, monthlyContribution },
       principal,
     )
-  }, [activeFunds, priceData, rebalance, useTotalReturn, monthlyContribution, principal])
+  }, [activeFunds, priceData, rebalanceFrequency, useTotalReturn, monthlyContribution, principal])
 
   const chartBounds = useMemo(() => {
     if (!priceData) return null
     return computeChartBounds(
       priceData,
-      { rebalance, useTotalReturn, monthlyContribution },
+      { rebalanceFrequency, useTotalReturn, monthlyContribution },
       principal,
     )
-  }, [priceData, rebalance, useTotalReturn, monthlyContribution, principal])
+  }, [priceData, rebalanceFrequency, useTotalReturn, monthlyContribution, principal])
 
   const rollingData = useMemo(() => {
     if (!result) return []
@@ -126,7 +130,34 @@ export default function App() {
         <div className="flex flex-1 min-h-0">
 
           {/* ── Left Control Panel ──────────────────────────────────── */}
-          <aside className="w-[320px] flex-shrink-0 border-r border-border flex flex-col min-h-0 bg-surface-1">
+          <aside
+            className="flex-shrink-0 border-r border-border flex min-h-0 bg-surface-1 transition-[width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] relative"
+            style={{ width: sidebarCollapsed ? 32 : 320 }}
+          >
+            {/* Collapse toggle */}
+            <button
+              onClick={() => {
+                const next = !sidebarCollapsed
+                setSidebarCollapsed(next)
+                try { localStorage.setItem('sidebar-collapsed', String(next)) } catch { /* */ }
+              }}
+              className="absolute top-2 right-0 translate-x-1/2 z-10 w-5 h-5 rounded-full bg-surface-1 border border-border flex items-center justify-center text-warm-300 hover:text-warm-50 hover:bg-surface-2 transition-colors"
+              aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              type="button"
+            >
+              <svg
+                width="10" height="10" viewBox="0 0 10 10" fill="none"
+                className="transition-transform duration-300"
+                style={{ transform: sidebarCollapsed ? 'rotate(180deg)' : '' }}
+              >
+                <path d="M6.5 2L3.5 5L6.5 8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+
+            <div className={[
+              'flex flex-col min-h-0 flex-1 transition-opacity duration-200',
+              sidebarCollapsed ? 'opacity-0 pointer-events-none overflow-hidden' : 'opacity-100',
+            ].join(' ')}>
 
             {/* Toggles + Principal */}
             <div className="px-3.5 py-2.5 border-b border-border flex-shrink-0 space-y-2.5">
@@ -138,16 +169,24 @@ export default function App() {
                 />
                 <div className="w-px h-3.5 bg-border" />
                 <ToggleSwitch
-                  checked={rebalance}
-                  onChange={setRebalance}
-                  label="Rebalance"
-                />
-                <div className="w-px h-3.5 bg-border" />
-                <ToggleSwitch
                   checked={showBenchmark}
                   onChange={setShowBenchmark}
                   label="Benchmark"
                 />
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="text-[11px] text-warm-200 flex-shrink-0">Rebalance</label>
+                <select
+                  value={rebalanceFrequency}
+                  onChange={(e) => setRebalanceFrequency(e.target.value as RebalanceFrequency)}
+                  className="flex-1 bg-surface-0 border border-border rounded-md px-2 py-1 text-xs font-mono text-warm-50 focus:outline-none focus:border-warm-300 transition-colors cursor-pointer appearance-none"
+                >
+                  <option value="none">None (Buy &amp; Hold)</option>
+                  <option value="monthly">Monthly</option>
+                  <option value="quarterly">Quarterly</option>
+                  <option value="semi-annual">Semi-Annual</option>
+                  <option value="annual">Annual</option>
+                </select>
               </div>
 
               {/* Starting principal + monthly contribution */}
@@ -202,7 +241,9 @@ export default function App() {
                 activeFunds={activeFunds}
                 onSetWeight={setWeight}
                 onRemove={removeFund}
+                onToggleLock={toggleLock}
               />
+            </div>
             </div>
           </aside>
 

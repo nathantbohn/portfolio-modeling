@@ -4,8 +4,10 @@ export const RISK_FREE_RATE = 0.02 // 2% annual
 
 // ─── Public types ────────────────────────────────────────────────────────────
 
+export type RebalanceFrequency = 'none' | 'monthly' | 'quarterly' | 'semi-annual' | 'annual'
+
 export interface PortfolioConfig {
-  rebalance: boolean
+  rebalanceFrequency: RebalanceFrequency
   useTotalReturn: boolean
   monthlyContribution: number
 }
@@ -129,15 +131,28 @@ export function computePortfolio(
   }
 
   let prevDate = dates[0]
-  let prevYear = dates[0].slice(0, 4)
+  let prevMonth = parseInt(dates[0].slice(5, 7), 10)
+  let monthCount = 0
+  const rebalPeriod =
+    config.rebalanceFrequency === 'monthly' ? 1
+    : config.rebalanceFrequency === 'quarterly' ? 3
+    : config.rebalanceFrequency === 'semi-annual' ? 6
+    : config.rebalanceFrequency === 'annual' ? 12
+    : 0 // 'none'
 
   for (let i = 1; i < n; i++) {
     const date = dates[i]
-    const year = date.slice(0, 4)
+    const month = parseInt(date.slice(5, 7), 10)
 
-    // Annual rebalance: reset to target weights at the start of each new calendar year,
-    // before computing that month's price change.
-    if (config.rebalance && year !== prevYear) {
+    // Count elapsed months for rebalance cadence
+    if (month !== prevMonth) {
+      monthCount++
+      prevMonth = month
+    }
+
+    // Rebalance at the start of each period
+    if (rebalPeriod > 0 && monthCount >= rebalPeriod) {
+      monthCount = 0
       let total = 0
       for (const { ticker } of active) total += holdings[ticker]
       for (const { ticker } of active) holdings[ticker] = weights[ticker] * total
@@ -172,7 +187,6 @@ export function computePortfolio(
       dividendValues[i] = { date, value: cumulativeDividend }
     }
     prevDate = date
-    prevYear = year
   }
 
   // ── Derived statistics ─────────────────────────────────────────────────────

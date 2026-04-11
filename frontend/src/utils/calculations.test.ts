@@ -45,7 +45,7 @@ describe('100% single-fund portfolio', () => {
     const data: PriceData = { VOO: priceSeries(dates, prices) }
     const alloc: Allocation[] = [{ ticker: 'VOO', weight: 100 }]
 
-    const { cumulativeValues } = computePortfolio(alloc, data, { rebalance: false, useTotalReturn: true, monthlyContribution: 0 })
+    const { cumulativeValues } = computePortfolio(alloc, data, { rebalanceFrequency: 'none', useTotalReturn: true, monthlyContribution: 0 })
 
     expect(cumulativeValues).toHaveLength(13)
     for (let i = 0; i < prices.length; i++) {
@@ -59,7 +59,7 @@ describe('100% single-fund portfolio', () => {
     const data: PriceData = { VOO: priceSeries(dates, prices) }
     const alloc: Allocation[] = [{ ticker: 'VOO', weight: 100 }]
 
-    const { annualizedVolatility } = computePortfolio(alloc, data, { rebalance: false, useTotalReturn: true, monthlyContribution: 0 })
+    const { annualizedVolatility } = computePortfolio(alloc, data, { rebalanceFrequency: 'none', useTotalReturn: true, monthlyContribution: 0 })
 
     expect(annualizedVolatility).toBeCloseTo(0, 10)
   })
@@ -70,7 +70,7 @@ describe('100% single-fund portfolio', () => {
     const data: PriceData = { VOO: priceSeries(dates, prices) }
     const alloc: Allocation[] = [{ ticker: 'VOO', weight: 100 }]
 
-    const { maxDrawdown } = computePortfolio(alloc, data, { rebalance: false, useTotalReturn: true, monthlyContribution: 0 })
+    const { maxDrawdown } = computePortfolio(alloc, data, { rebalanceFrequency: 'none', useTotalReturn: true, monthlyContribution: 0 })
 
     expect(maxDrawdown).toBe(0)
   })
@@ -85,7 +85,7 @@ describe('100% single-fund portfolio', () => {
     const data: PriceData = { VOO: priceSeries(dates, prices) }
     const alloc: Allocation[] = [{ ticker: 'VOO', weight: 100 }]
 
-    const { cagr } = computePortfolio(alloc, data, { rebalance: false, useTotalReturn: true, monthlyContribution: 0 })
+    const { cagr } = computePortfolio(alloc, data, { rebalanceFrequency: 'none', useTotalReturn: true, monthlyContribution: 0 })
 
     const analytic = Math.pow(1.01, 12) - 1 // ≈ 12.68%
     expect(cagr).toBeCloseTo(analytic, 1) // within ~0.1 pp
@@ -98,7 +98,7 @@ describe('100% single-fund portfolio', () => {
     const data: PriceData = { VOO: priceSeries(dates, prices) }
     const alloc: Allocation[] = [{ ticker: 'VOO', weight: 100 }]
 
-    const { maxDrawdown } = computePortfolio(alloc, data, { rebalance: false, useTotalReturn: true, monthlyContribution: 0 })
+    const { maxDrawdown } = computePortfolio(alloc, data, { rebalanceFrequency: 'none', useTotalReturn: true, monthlyContribution: 0 })
 
     expect(maxDrawdown).toBeCloseTo(0.5, 6) // 50% drawdown
   })
@@ -111,7 +111,7 @@ describe('100% single-fund portfolio', () => {
     const alloc: Allocation[] = [{ ticker: 'VOO', weight: 100 }]
 
     const { cagr, annualizedVolatility, sharpeRatio } = computePortfolio(
-      alloc, data, { rebalance: false, useTotalReturn: true, monthlyContribution: 0 }
+      alloc, data, { rebalanceFrequency: 'none', useTotalReturn: true, monthlyContribution: 0 }
     )
 
     const expected = annualizedVolatility > 0 ? (cagr - RISK_FREE_RATE) / annualizedVolatility : 0
@@ -134,7 +134,7 @@ describe('60/40 portfolio', () => {
       { ticker: 'B', weight: 40 },
     ]
 
-    const { cumulativeValues } = computePortfolio(alloc, data, { rebalance: false, useTotalReturn: true, monthlyContribution: 0 })
+    const { cumulativeValues } = computePortfolio(alloc, data, { rebalanceFrequency: 'none', useTotalReturn: true, monthlyContribution: 0 })
 
     expect(cumulativeValues[1].value).toBeCloseTo(10_000 * 1.044, 6)
   })
@@ -153,7 +153,7 @@ describe('60/40 portfolio', () => {
       { ticker: 'B', weight: 40 },
     ]
 
-    const { cumulativeValues } = computePortfolio(alloc, data, { rebalance: false, useTotalReturn: true, monthlyContribution: 0 })
+    const { cumulativeValues } = computePortfolio(alloc, data, { rebalanceFrequency: 'none', useTotalReturn: true, monthlyContribution: 0 })
 
     for (let i = 0; i < prices.length; i++) {
       expect(cumulativeValues[i].value).toBeCloseTo(10_000 * prices[i] / prices[0], 6)
@@ -174,7 +174,7 @@ describe('60/40 portfolio', () => {
     ]
 
     const { annualReturns, cumulativeValues } = computePortfolio(
-      alloc, data, { rebalance: false, useTotalReturn: true, monthlyContribution: 0 }
+      alloc, data, { rebalanceFrequency: 'none', useTotalReturn: true, monthlyContribution: 0 }
     )
 
     expect(annualReturns).toHaveLength(1)
@@ -216,12 +216,12 @@ describe('rebalancing', () => {
     return { data, alloc }
   }
 
-  test('rebalance=true and rebalance=false produce different final values', () => {
+  test('annual rebalance and no rebalance produce different final values', () => {
     const { data, alloc } = twoYearData()
     const cfg = { useTotalReturn: true, monthlyContribution: 0 }
 
-    const withRebalance = computePortfolio(alloc, data, { ...cfg, rebalance: true })
-    const withoutRebalance = computePortfolio(alloc, data, { ...cfg, rebalance: false })
+    const withRebalance = computePortfolio(alloc, data, { ...cfg, rebalanceFrequency: 'annual' })
+    const withoutRebalance = computePortfolio(alloc, data, { ...cfg, rebalanceFrequency: 'none' })
 
     const finalWith = withRebalance.cumulativeValues.at(-1)!.value
     const finalWithout = withoutRebalance.cumulativeValues.at(-1)!.value
@@ -231,11 +231,11 @@ describe('rebalancing', () => {
     expect(finalWith).toBeGreaterThan(finalWithout)
   })
 
-  test('rebalance=true produces different annual returns than rebalance=false', () => {
+  test('annual rebalance produces different annual returns than no rebalance', () => {
     const { data, alloc } = twoYearData()
 
-    const withRebalance = computePortfolio(alloc, data, { rebalance: true, useTotalReturn: true, monthlyContribution: 0 })
-    const withoutRebalance = computePortfolio(alloc, data, { rebalance: false, useTotalReturn: true, monthlyContribution: 0 })
+    const withRebalance = computePortfolio(alloc, data, { rebalanceFrequency: 'annual', useTotalReturn: true, monthlyContribution: 0 })
+    const withoutRebalance = computePortfolio(alloc, data, { rebalanceFrequency: 'none', useTotalReturn: true, monthlyContribution: 0 })
 
     // Year-2 annual return should differ because of the rebalance
     const wr2 = withRebalance.annualReturns.find((r) => r.year === 2021)!
@@ -256,8 +256,8 @@ describe('useTotalReturn toggle', () => {
     }
     const alloc: Allocation[] = [{ ticker: 'SCHD', weight: 100 }]
 
-    const totalReturn = computePortfolio(alloc, data, { rebalance: false, useTotalReturn: true, monthlyContribution: 0 })
-    const priceReturn = computePortfolio(alloc, data, { rebalance: false, useTotalReturn: false, monthlyContribution: 0 })
+    const totalReturn = computePortfolio(alloc, data, { rebalanceFrequency: 'none', useTotalReturn: true, monthlyContribution: 0 })
+    const priceReturn = computePortfolio(alloc, data, { rebalanceFrequency: 'none', useTotalReturn: false, monthlyContribution: 0 })
 
     // Total return ends higher because adjusted_close grew more
     expect(totalReturn.cumulativeValues.at(-1)!.value).toBeGreaterThan(
@@ -277,7 +277,7 @@ describe('edge cases', () => {
     }
     const alloc: Allocation[] = [{ ticker: 'VOO', weight: 100 }]
 
-    const result = computePortfolio(alloc, data, { rebalance: false, useTotalReturn: true, monthlyContribution: 0 })
+    const result = computePortfolio(alloc, data, { rebalanceFrequency: 'none', useTotalReturn: true, monthlyContribution: 0 })
 
     expect(result.cumulativeValues).toHaveLength(1)
     expect(result.cumulativeValues[0].value).toBe(10_000)
@@ -299,12 +299,12 @@ describe('edge cases', () => {
     const without = computePortfolio(
       [{ ticker: 'A', weight: 100 }],
       data,
-      { rebalance: false, useTotalReturn: true, monthlyContribution: 0 },
+      { rebalanceFrequency: 'none', useTotalReturn: true, monthlyContribution: 0 },
     )
     const withZero = computePortfolio(
       [{ ticker: 'A', weight: 100 }, { ticker: 'B', weight: 0 }],
       data,
-      { rebalance: false, useTotalReturn: true, monthlyContribution: 0 },
+      { rebalanceFrequency: 'none', useTotalReturn: true, monthlyContribution: 0 },
     )
 
     expect(withZero.cagr).toBeCloseTo(without.cagr, 10)
@@ -314,7 +314,7 @@ describe('edge cases', () => {
   })
 
   test('empty allocations returns empty result', () => {
-    const result = computePortfolio([], {}, { rebalance: false, useTotalReturn: true, monthlyContribution: 0 })
+    const result = computePortfolio([], {}, { rebalanceFrequency: 'none', useTotalReturn: true, monthlyContribution: 0 })
 
     expect(result.cumulativeValues).toHaveLength(0)
     expect(result.cagr).toBe(0)
@@ -325,7 +325,7 @@ describe('edge cases', () => {
     const data: PriceData = { A: priceSeries(dates, compoundPrices(100, 0.01, 5)) }
     const alloc: Allocation[] = [{ ticker: 'A', weight: 0 }]
 
-    const result = computePortfolio(alloc, data, { rebalance: false, useTotalReturn: true, monthlyContribution: 0 })
+    const result = computePortfolio(alloc, data, { rebalanceFrequency: 'none', useTotalReturn: true, monthlyContribution: 0 })
 
     expect(result.cumulativeValues).toHaveLength(0)
   })
@@ -341,12 +341,12 @@ describe('edge cases', () => {
     const unnorm = computePortfolio(
       [{ ticker: 'A', weight: 30 }, { ticker: 'B', weight: 20 }],
       data,
-      { rebalance: false, useTotalReturn: true, monthlyContribution: 0 },
+      { rebalanceFrequency: 'none', useTotalReturn: true, monthlyContribution: 0 },
     )
     const norm = computePortfolio(
       [{ ticker: 'A', weight: 60 }, { ticker: 'B', weight: 40 }],
       data,
-      { rebalance: false, useTotalReturn: true, monthlyContribution: 0 },
+      { rebalanceFrequency: 'none', useTotalReturn: true, monthlyContribution: 0 },
     )
 
     expect(unnorm.cumulativeValues.at(-1)!.value).toBeCloseTo(
@@ -363,7 +363,7 @@ describe('edge cases', () => {
     ]
 
     // Should run without throwing, treating MISSING as inactive
-    const result = computePortfolio(alloc, data, { rebalance: false, useTotalReturn: true, monthlyContribution: 0 })
+    const result = computePortfolio(alloc, data, { rebalanceFrequency: 'none', useTotalReturn: true, monthlyContribution: 0 })
 
     expect(result.cumulativeValues.length).toBeGreaterThan(0)
   })
@@ -472,7 +472,7 @@ describe('performance', () => {
     }
 
     const alloc: Allocation[] = tickers.map((ticker) => ({ ticker, weight: 25 }))
-    const config = { rebalance: true, useTotalReturn: true, monthlyContribution: 0 }
+    const config = { rebalanceFrequency: 'annual' as const, useTotalReturn: true, monthlyContribution: 0 }
 
     // Warm-up (JIT)
     for (let i = 0; i < 10; i++) computePortfolio(alloc, priceData, config)

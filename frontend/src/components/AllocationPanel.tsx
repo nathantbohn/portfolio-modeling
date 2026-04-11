@@ -6,9 +6,10 @@ interface AllocationPanelProps {
   activeFunds: Allocation[]
   onSetWeight: (ticker: string, weight: number) => void
   onRemove: (ticker: string) => void
+  onToggleLock: (ticker: string) => void
 }
 
-export default function AllocationPanel({ activeFunds, onSetWeight, onRemove }: AllocationPanelProps) {
+export default function AllocationPanel({ activeFunds, onSetWeight, onRemove, onToggleLock }: AllocationPanelProps) {
   const total = activeFunds.reduce((s, f) => s + f.weight, 0)
   const sumOk = Math.abs(total - 100) < 0.01
 
@@ -53,6 +54,7 @@ export default function AllocationPanel({ activeFunds, onSetWeight, onRemove }: 
                 fund={fund}
                 onSetWeight={onSetWeight}
                 onRemove={onRemove}
+                onToggleLock={onToggleLock}
                 canRemove={activeFunds.length > 1}
               />
             ))}
