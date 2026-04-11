@@ -6,11 +6,12 @@ import { parseUrlState } from '../utils/urlState'
 export const ALL_TICKERS = [
   'VOO', 'BND', 'VXUS', 'SCHD', 'SCHF',
   'SCHI', 'VTI', 'QQQ', 'BNDX', 'VBR',
+  'GLD', 'DBC',
 ] as const
 
 export type Ticker = typeof ALL_TICKERS[number]
 
-const MAX_FUNDS = 4
+const MAX_FUNDS = 5
 
 const DEFAULT_FUNDS: Allocation[] = [
   { ticker: 'VOO', weight: 60 },

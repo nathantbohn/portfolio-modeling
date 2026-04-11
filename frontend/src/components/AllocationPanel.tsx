@@ -28,7 +28,7 @@ export default function AllocationPanel({ activeFunds, onSetWeight, onRemove, on
           >
             {total.toFixed(1)}%
           </span>
-          <span className="text-[10px] text-warm-300">{activeFunds.length}/4</span>
+          <span className="text-[10px] text-warm-300">{activeFunds.length}/5</span>
         </div>
       </div>
 

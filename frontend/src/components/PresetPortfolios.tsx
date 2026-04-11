@@ -45,12 +45,13 @@ const PRESETS: Preset[] = [
   },
   {
     name: 'All Weather',
-    subtitle: 'VOO 30 · BND 40 · VXUS 15 · SCHD 15',
+    subtitle: 'VOO 30 · BND 40 · VXUS 15 · GLD 7.5 · DBC 7.5',
     funds: [
       { ticker: 'VOO', weight: 30 },
       { ticker: 'BND', weight: 40 },
       { ticker: 'VXUS', weight: 15 },
-      { ticker: 'SCHD', weight: 15 },
+      { ticker: 'GLD', weight: 7.5 },
+      { ticker: 'DBC', weight: 7.5 },
     ],
   },
 ]

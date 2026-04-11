@@ -15,7 +15,7 @@ sys.path.insert(0, __file__.rsplit("/", 1)[0] if "/" in __file__ else ".")
 
 from db import init_db, upsert_prices
 
-TICKERS = ["VOO", "BND", "VXUS", "SCHD", "SCHF", "SCHI", "VTI", "QQQ", "BNDX", "VBR"]
+TICKERS = ["VOO", "BND", "VXUS", "SCHD", "SCHF", "SCHI", "VTI", "QQQ", "BNDX", "VBR", "GLD", "DBC"]
 
 END_DATE = date.today()
 START_DATE = END_DATE.replace(year=END_DATE.year - 15)

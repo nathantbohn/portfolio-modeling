@@ -15,6 +15,8 @@ export const FUND_META: Record<string, { name: string; color: string }> = {
   QQQ:  { name: 'Invesco NASDAQ-100',           color: '#6B3A5E' },  // warm plum
   BNDX: { name: 'Vanguard Total Intl Bond',     color: '#A15E30' },  // copper
   VBR:  { name: 'Vanguard Small-Cap Value',     color: '#8B5E3C' },  // sienna
+  GLD:  { name: 'SPDR Gold Shares',             color: '#B8960C' },  // gold
+  DBC:  { name: 'Invesco DB Commodity Index',   color: '#7A6233' },  // dark amber
 }
 
 export interface Allocation {

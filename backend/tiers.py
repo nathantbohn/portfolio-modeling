@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 FREE_FUNDS = [
     "VOO", "BND", "VXUS", "SCHD", "SCHF",
     "SCHI", "VTI", "QQQ", "BNDX", "VBR",
+    "GLD", "DBC",
 ]
 
 FREE_FEATURES = [
@@ -53,7 +54,7 @@ class TierConfig:
 TIERS: dict[str, TierConfig] = {
     "free": TierConfig(
         name="free",
-        max_funds_in_portfolio=4,
+        max_funds_in_portfolio=5,
         max_years_history=15,
         available_funds=FREE_FUNDS,
         features=FREE_FEATURES,

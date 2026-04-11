@@ -14,6 +14,7 @@ export interface TierConfig {
 const FREE_FUNDS = [
   'VOO', 'BND', 'VXUS', 'SCHD', 'SCHF',
   'SCHI', 'VTI', 'QQQ', 'BNDX', 'VBR',
+  'GLD', 'DBC',
 ]
 
 const FREE_FEATURES = [
@@ -42,7 +43,7 @@ const PREMIUM_FEATURES = [
 export const TIERS: Record<TierName, TierConfig> = {
   free: {
     name: 'free',
-    maxFundsInPortfolio: 4,
+    maxFundsInPortfolio: 5,
     maxYearsHistory: 15,
     availableFunds: FREE_FUNDS,
     features: FREE_FEATURES,
