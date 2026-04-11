@@ -12,11 +12,13 @@ import CumulativeChart from './components/CumulativeChart'
 import AnnualReturnsChart from './components/AnnualReturnsChart'
 import RollingReturnsChart from './components/RollingReturnsChart'
 import ResizablePanel from './components/ResizablePanel'
+import PresetPortfolios from './components/PresetPortfolios'
 import { parseUrlState, buildShareUrl } from './utils/urlState'
 
 export default function App() {
   const {
     activeFunds,
+    setFunds,
     addFund,
     removeFund,
     setWeight,
@@ -194,6 +196,7 @@ export default function App() {
 
             {/* Scrollable controls area */}
             <div className="flex-1 min-h-0 overflow-y-auto">
+              <PresetPortfolios onSelect={setFunds} />
               <FundTray activeTickers={activeTickers} isFull={isFull} />
               <AllocationPanel
                 activeFunds={activeFunds}

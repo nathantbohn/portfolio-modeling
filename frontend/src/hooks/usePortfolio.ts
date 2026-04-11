@@ -88,6 +88,7 @@ export function applyWeightChange(
 
 export interface PortfolioState {
   activeFunds: Allocation[]
+  setFunds: (funds: Allocation[]) => void
   addFund: (ticker: string) => void
   removeFund: (ticker: string) => void
   setWeight: (ticker: string, weight: number) => void
@@ -145,6 +146,7 @@ export function usePortfolio(): PortfolioState {
 
   return {
     activeFunds,
+    setFunds: setActiveFunds,
     addFund,
     removeFund,
     setWeight,
