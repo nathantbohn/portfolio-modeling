@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
 import { DndContext, type DragEndEvent } from '@dnd-kit/core'
-import { usePortfolio } from './hooks/usePortfolio'
+import { usePortfolio, ALL_TICKERS } from './hooks/usePortfolio'
 import { usePriceData } from './hooks/usePriceData'
 import { useCustomFunds } from './hooks/useCustomFunds'
 import { useStockPrices } from './hooks/useStockPrices'
@@ -132,13 +132,14 @@ export default function App() {
   }, [activeFunds, mergedPriceData, rebalanceFrequency, useTotalReturn, monthlyContribution, principal])
 
   const chartBounds = useMemo(() => {
-    if (!mergedPriceData) return null
+    if (!priceData) return null
     return computeChartBounds(
-      mergedPriceData,
+      priceData,
       { rebalanceFrequency, useTotalReturn, monthlyContribution },
       principal,
+      [...ALL_TICKERS],
     )
-  }, [mergedPriceData, rebalanceFrequency, useTotalReturn, monthlyContribution, principal])
+  }, [priceData, rebalanceFrequency, useTotalReturn, monthlyContribution, principal])
 
   const rollingData = useMemo(() => {
     if (!result) return []

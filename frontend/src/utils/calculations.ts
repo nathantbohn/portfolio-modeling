@@ -300,8 +300,9 @@ export function computeChartBounds(
   priceData: PriceData,
   config: PortfolioConfig,
   initialValue: number,
+  tickers?: string[],
 ): ChartBounds {
-  const tickers = Object.keys(priceData)
+  tickers = tickers ?? Object.keys(priceData)
   let cumulativeMax = initialValue
   let annualReturnMax = 0.05 // minimum floor
 
