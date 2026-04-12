@@ -14,7 +14,8 @@ export interface TierConfig {
 const FREE_FUNDS = [
   'VOO', 'BND', 'VXUS', 'SCHD', 'SCHF',
   'SCHI', 'VTI', 'QQQ', 'BNDX', 'VBR',
-  'GLD', 'DBC',
+  'GLD', 'DBC', 'MCMERICA-25',
+  'FXAIX', 'FSKAX', 'FTIHX', 'FXNAX', 'FBGRX',
 ]
 
 const FREE_FEATURES = [

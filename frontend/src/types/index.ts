@@ -18,6 +18,11 @@ export const FUND_META: Record<string, { name: string; color: string }> = {
   GLD:  { name: 'SPDR Gold Shares',             color: '#B8960C' },  // gold
   DBC:  { name: 'Invesco DB Commodity Index',   color: '#7A6233' },  // dark amber
   'MCMERICA-25': { name: 'McMerica 25',         color: '#6B4C2A' },  // warm brown
+  FXAIX: { name: 'Fidelity 500 Index',          color: '#2D6A4F' },  // fidelity green
+  FSKAX: { name: 'Fidelity Total Market Index',  color: '#40916C' },  // sage
+  FTIHX: { name: 'Fidelity Total Intl Index',    color: '#52796F' },  // muted teal
+  FXNAX: { name: 'Fidelity US Bond Index',       color: '#74A892' },  // soft green
+  FBGRX: { name: 'Fidelity Blue Chip Growth',    color: '#1B4332' },  // deep forest
 }
 
 export interface Allocation {

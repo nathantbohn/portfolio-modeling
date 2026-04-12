@@ -1,6 +1,6 @@
 import { useDraggable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
-import { ALL_TICKERS } from '../hooks/usePortfolio'
+import { ALL_TICKERS, MUTUAL_FUND_TICKERS } from '../hooks/usePortfolio'
 import { FUND_META } from '../types'
 import type { CustomFund } from '../types'
 
@@ -112,6 +112,23 @@ export default function FundTray({ activeTickers, isFull, customFunds, onOpenBui
 
       <div className="p-1.5 space-y-px">
         {ALL_TICKERS.map((ticker) => {
+          const isActive = activeTickers.has(ticker)
+          const disabled = isActive || isFull
+          return (
+            <DraggableFund
+              key={ticker}
+              ticker={ticker}
+              disabled={disabled}
+              isActive={isActive}
+            />
+          )
+        })}
+
+        {/* Mutual Funds */}
+        <div className="pt-2 pb-1 px-1">
+          <p className="text-[9px] font-semibold uppercase tracking-widest text-warm-300">Mutual Funds</p>
+        </div>
+        {MUTUAL_FUND_TICKERS.map((ticker) => {
           const isActive = activeTickers.has(ticker)
           const disabled = isActive || isFull
           return (

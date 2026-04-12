@@ -6,7 +6,8 @@ from dataclasses import dataclass, field
 FREE_FUNDS = [
     "VOO", "BND", "VXUS", "SCHD", "SCHF",
     "SCHI", "VTI", "QQQ", "BNDX", "VBR",
-    "GLD", "DBC",
+    "GLD", "DBC", "MCMERICA-25",
+    "FXAIX", "FSKAX", "FTIHX", "FXNAX", "FBGRX",
 ]
 
 FREE_FEATURES = [

@@ -12,6 +12,7 @@ DB_PATH = os.path.join(ROOT, "data", "prices.db")
 OUT_PATH = os.path.join(ROOT, "frontend", "public", "data", "prices.json")
 
 ETFS = ["VOO", "BND", "VXUS", "SCHD", "SCHF", "SCHI", "VTI", "QQQ", "BNDX", "VBR", "GLD", "DBC", "DIA"]
+MUTUAL_FUNDS = ["FXAIX", "FSKAX", "FTIHX", "FXNAX", "FBGRX"]
 
 MCMERICA_25 = [
     "CVX", "MCD", "PEP", "COST", "BRK-B", "PM", "WDC", "DD", "JNJ", "F",
@@ -19,7 +20,7 @@ MCMERICA_25 = [
     "CAT", "GD", "T", "DIS", "DE",
 ]
 
-EXPORT_TICKERS = sorted(set(ETFS + MCMERICA_25))
+EXPORT_TICKERS = sorted(set(ETFS + MUTUAL_FUNDS + MCMERICA_25))
 
 
 def synthesize_mcmerica(all_data: dict[str, list[dict]]) -> list[dict]:
