@@ -18,7 +18,7 @@ import ResizablePanel from './components/ResizablePanel'
 import PresetPortfolios from './components/PresetPortfolios'
 import CustomFundBuilder from './components/CustomFundBuilder'
 import TickerBanner from './components/TickerBanner'
-import { MCMERICA_25, MCMERICA_25_ID, MCMERICA_25_TICKERS, MCMERICA_25_COLOR } from './config/mcmerica25'
+import { MCMERICA_25, MCMERICA_25_ID, MCMERICA_25_COLOR } from './config/mcmerica25'
 import { parseUrlState, buildShareUrl } from './utils/urlState'
 
 export default function App() {
@@ -43,10 +43,17 @@ export default function App() {
   const { customFunds, addCustomFund } = useCustomFunds()
   const [showBuilder, setShowBuilder] = useState(false)
 
-  // Determine which stock tickers need fetching — always include McMerica 25 + active custom funds
+  // McMerica 25: synthesize from static price data (constituents are in prices.json)
+  const mcmericaPriceData = useMemo(() => {
+    if (!priceData) return null
+    const synth = synthesizePriceData(MCMERICA_25, priceData)
+    return synth.length > 0 ? synth : null
+  }, [priceData])
+
+  // Fetch individual stock prices for user-created custom funds (requires VITE_API_URL)
   const stockTickersToFetch = useMemo(() => {
-    const tickers = new Set<string>(MCMERICA_25_TICKERS)
     const activeCustomIds = new Set(activeFunds.map((f) => f.ticker).filter((t) => t.startsWith('CUSTOM-')))
+    const tickers = new Set<string>()
     for (const fund of customFunds) {
       if (activeCustomIds.has(fund.id)) {
         for (const s of fund.stocks) tickers.add(s.ticker)
@@ -57,13 +64,6 @@ export default function App() {
 
   const { data: stockPrices } = useStockPrices(stockTickersToFetch)
 
-  // Synthesize McMerica 25 price data
-  const mcmericaPriceData = useMemo(() => {
-    if (Object.keys(stockPrices).length === 0) return null
-    const synth = synthesizePriceData(MCMERICA_25, stockPrices)
-    return synth.length > 0 ? synth : null
-  }, [stockPrices])
-
   // Merge synthesized custom fund + McMerica price data with base price data
   const mergedPriceData = useMemo(() => {
     if (!priceData) return null
@@ -72,7 +72,7 @@ export default function App() {
     // Always include McMerica 25
     if (mcmericaPriceData) merged[MCMERICA_25_ID] = mcmericaPriceData
 
-    // Include active custom funds
+    // Include active user-created custom funds
     const activeCustomIds = new Set(
       activeFunds.map((f) => f.ticker).filter((t) => t.startsWith('CUSTOM-')),
     )
