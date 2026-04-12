@@ -2,6 +2,8 @@ import type { PricePoint } from '../types'
 
 const MONO = "'JetBrains Mono', ui-monospace, monospace"
 const BASE_VALUE = 1000
+// Base date: April 10, 2026 market close. Monthly data uses 2026-04-01.
+const BASE_DATE = '2026-04-01'
 
 interface TickerBannerProps {
   priceData: PricePoint[] | null
@@ -16,12 +18,15 @@ export default function TickerBanner({ priceData }: TickerBannerProps) {
     )
   }
 
-  const first = priceData[0].adjusted_close
+  // Find the base date point (April 2026) to anchor value at 1,000
+  const basePoint = priceData.find((p) => p.date === BASE_DATE)
+  const basePrice = basePoint ? basePoint.adjusted_close : priceData[priceData.length - 1].adjusted_close
+
   const last = priceData[priceData.length - 1].adjusted_close
   const prev = priceData[priceData.length - 2].adjusted_close
 
-  const currentValue = BASE_VALUE * (last / first)
-  const prevValue = BASE_VALUE * (prev / first)
+  const currentValue = BASE_VALUE * (last / basePrice)
+  const prevValue = BASE_VALUE * (prev / basePrice)
   const change = currentValue - prevValue
   const changePct = (change / prevValue) * 100
   const isUp = change >= 0
