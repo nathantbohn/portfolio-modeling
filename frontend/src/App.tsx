@@ -158,7 +158,7 @@ export default function App() {
         <header className="flex-shrink-0 flex items-center justify-between px-5 h-11 border-b border-border">
           <div className="flex items-center gap-3">
             <h1 className="text-[13px] font-semibold tracking-tight text-warm-50">
-              Pioneer Backtesting
+              Callibrated Index Services
             </h1>
             {loading && (
               <span className="text-[11px] text-warm-300 animate-pulse">Loading…</span>
