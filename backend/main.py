@@ -7,6 +7,7 @@ Endpoints:
   GET /tickers          → list of available tickers
 """
 
+import os
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
@@ -15,6 +16,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from db import get_all_tickers, get_prices_by_ticker, init_db
+
+DEFAULT_ORIGINS = "http://localhost:3000,http://localhost:5173"
+ALLOWED_ORIGINS = [
+    o.strip() for o in os.environ.get("ALLOWED_ORIGINS", DEFAULT_ORIGINS).split(",") if o.strip()
+]
 
 
 @asynccontextmanager
@@ -27,7 +33,7 @@ app = FastAPI(title="Portfolio Backtester API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:5173"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_methods=["GET"],
     allow_headers=["*"],
 )
