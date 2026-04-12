@@ -152,7 +152,7 @@ export default function App() {
       <div className="h-screen flex flex-col bg-surface-0 text-warm-50 overflow-hidden">
 
         {/* ── Ticker Banner ────────────────────────────────────────── */}
-        <TickerBanner priceData={priceData?.['MCMERICA-25'] ?? null} />
+        <TickerBanner priceData={priceData} />
 
         {/* ── Header ────────────────────────────────────────────────── */}
         <header className="flex-shrink-0 flex items-center justify-between px-5 h-11 border-b border-border">

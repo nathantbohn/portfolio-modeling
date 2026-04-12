@@ -11,7 +11,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_PATH = os.path.join(ROOT, "data", "prices.db")
 OUT_PATH = os.path.join(ROOT, "frontend", "public", "data", "prices.json")
 
-ETFS = ["VOO", "BND", "VXUS", "SCHD", "SCHF", "SCHI", "VTI", "QQQ", "BNDX", "VBR", "GLD", "DBC"]
+ETFS = ["VOO", "BND", "VXUS", "SCHD", "SCHF", "SCHI", "VTI", "QQQ", "BNDX", "VBR", "GLD", "DBC", "DIA"]
 
 MCMERICA_25 = [
     "CVX", "MCD", "PEP", "COST", "BRK-B", "PM", "WDC", "DD", "JNJ", "F",
