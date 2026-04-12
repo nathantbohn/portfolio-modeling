@@ -3,12 +3,36 @@ import type { CustomFund } from '../types'
 export const MCMERICA_25_ID = 'MCMERICA-25'
 export const MCMERICA_25_COLOR = '#B8960C' // gold
 
+/**
+ * The McMerica 25 — "The 25 Most American Stocks"
+ * Constituents per MCMERICA_25.txt
+ */
 export const MCMERICA_25_TICKERS = [
-  'AAPL', 'MSFT', 'AMZN', 'GOOGL', 'META',
-  'JPM', 'JNJ', 'PG', 'KO', 'DIS',
-  'HD', 'MCD', 'NKE', 'BA', 'CAT',
-  'DE', 'F', 'GM', 'XOM', 'CVX',
-  'WMT', 'COST', 'UNH', 'V', 'MA',
+  'CVX',   // Chevron
+  'MCD',   // McDonalds
+  'PEP',   // Pepsi
+  'COST',  // Costco
+  'BRK-B', // Berkshire Hathaway
+  'PM',    // Philip Morris
+  'WDC',   // Western Digital
+  'DD',    // DuPont
+  'JNJ',   // Johnson & Johnson
+  'F',     // Ford
+  'COP',   // ConocoPhillips
+  'WMT',   // Walmart
+  'BUD',   // Anheuser-Busch
+  'FCX',   // Freeport-McMoRan
+  'HD',    // Home Depot
+  'HOG',   // Harley-Davidson
+  'AAL',   // American Airlines
+  'HLT',   // Hilton
+  'AXP',   // American Express
+  'JPM',   // JPMorgan Chase
+  'CAT',   // Caterpillar
+  'GD',    // General Dynamics
+  'T',     // AT&T
+  'DIS',   // Disney
+  'DE',    // Deere & Company
 ] as const
 
 export const MCMERICA_25: CustomFund = {
