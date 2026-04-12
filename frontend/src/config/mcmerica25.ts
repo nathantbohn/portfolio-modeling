@@ -20,12 +20,12 @@ export const MCMERICA_25_TICKERS = [
   'F',     // Ford
   'COP',   // ConocoPhillips
   'WMT',   // Walmart
-  'BUD',   // Anheuser-Busch
+  'TAP',   // Molson Coors
   'FCX',   // Freeport-McMoRan
   'HD',    // Home Depot
   'HOG',   // Harley-Davidson
   'AAL',   // American Airlines
-  'HLT',   // Hilton
+  'MAR',   // Marriott
   'AXP',   // American Express
   'JPM',   // JPMorgan Chase
   'CAT',   // Caterpillar
