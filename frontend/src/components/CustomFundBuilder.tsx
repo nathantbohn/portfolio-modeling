@@ -28,6 +28,7 @@ export default function CustomFundBuilder({ onClose, onCreate }: CustomFundBuild
   const [showResults, setShowResults] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const searchRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   // Debounced search
   const doSearch = useCallback((q: string) => {
@@ -135,6 +136,7 @@ export default function CustomFundBuilder({ onClose, onCreate }: CustomFundBuild
             ) : (
               <>
                 <input
+                  ref={inputRef}
                   type="text"
                   value={query}
                   onChange={(e) => { setQuery(e.target.value); setShowResults(true) }}
@@ -143,24 +145,30 @@ export default function CustomFundBuilder({ onClose, onCreate }: CustomFundBuild
                   disabled={stocks.length >= MAX_STOCKS}
                   className="w-full bg-surface-0 border border-border rounded-md px-2.5 py-1.5 text-xs text-warm-50 placeholder:text-warm-400 focus:outline-none focus:border-warm-300 transition-colors disabled:opacity-40"
                 />
-                {showResults && results.length > 0 && (
-                  <div className="absolute z-10 top-full left-0 right-0 mt-1 bg-surface-1 border border-border rounded-md shadow-lg max-h-48 overflow-y-auto">
-                    {results
-                      .filter((r) => !stocks.some((s) => s.ticker === r.ticker))
-                      .map((r) => (
-                        <button
-                          key={r.ticker}
-                          onClick={() => addStock(r)}
-                          className="w-full px-2.5 py-1.5 flex items-center gap-2 hover:bg-surface-2 transition-colors text-left"
-                          type="button"
-                        >
-                          <span className="text-xs font-semibold text-warm-50 w-12 flex-shrink-0">{r.ticker}</span>
-                          <span className="text-[11px] text-warm-200 truncate flex-1">{r.name}</span>
-                          <span className="text-[10px] text-warm-400 flex-shrink-0">{r.sector}</span>
-                        </button>
-                      ))}
-                  </div>
-                )}
+                {showResults && results.length > 0 && inputRef.current && (() => {
+                  const rect = inputRef.current!.getBoundingClientRect()
+                  return (
+                    <div
+                      className="fixed z-[60] bg-surface-1 border border-border rounded-md shadow-lg max-h-56 overflow-y-auto"
+                      style={{ top: rect.bottom + 4, left: rect.left, width: rect.width }}
+                    >
+                      {results
+                        .filter((r) => !stocks.some((s) => s.ticker === r.ticker))
+                        .map((r) => (
+                          <button
+                            key={r.ticker}
+                            onClick={() => addStock(r)}
+                            className="w-full px-2.5 py-1.5 flex items-center gap-2 hover:bg-surface-2 transition-colors text-left"
+                            type="button"
+                          >
+                            <span className="text-xs font-semibold text-warm-50 w-12 flex-shrink-0">{r.ticker}</span>
+                            <span className="text-[11px] text-warm-200 truncate flex-1">{r.name}</span>
+                            <span className="text-[10px] text-warm-400 flex-shrink-0">{r.sector}</span>
+                          </button>
+                        ))}
+                    </div>
+                  )
+                })()}
               </>
             )}
           </div>

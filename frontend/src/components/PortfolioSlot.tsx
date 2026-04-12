@@ -16,6 +16,7 @@ export default function PortfolioSlot({ fund, onSetWeight, onRemove, onToggleLoc
   const meta = FUND_META[fund.ticker] ?? { name: fund.ticker, color: '#990F3D' }
   const color = colorOverride ?? meta.color
   const name = nameOverride ?? meta.name
+  const isCustom = ticker.startsWith('CUSTOM-')
   const { ticker, weight, locked } = fund
 
   const sliderStyle: CSSProperties = {
@@ -37,13 +38,27 @@ export default function PortfolioSlot({ fund, onSetWeight, onRemove, onToggleLoc
         {/* Header row */}
         <div className="flex items-center justify-between mb-1.5">
           <div className="flex items-baseline gap-1.5 min-w-0">
-            <span
-              className="text-xs font-semibold tracking-wide flex-shrink-0"
-              style={{ color }}
-            >
-              {ticker}
-            </span>
-            <span className="text-[10px] text-warm-200 truncate">{name}</span>
+            {isCustom ? (
+              <>
+                <span
+                  className="text-xs font-semibold tracking-wide truncate"
+                  style={{ color }}
+                >
+                  {name}
+                </span>
+                <span className="text-[9px] text-warm-400 border border-warm-400/30 rounded px-1 py-px leading-none flex-shrink-0">Custom</span>
+              </>
+            ) : (
+              <>
+                <span
+                  className="text-xs font-semibold tracking-wide flex-shrink-0"
+                  style={{ color }}
+                >
+                  {ticker}
+                </span>
+                <span className="text-[10px] text-warm-200 truncate">{name}</span>
+              </>
+            )}
           </div>
 
           <div className="flex items-center gap-0.5 flex-shrink-0 ml-1">
