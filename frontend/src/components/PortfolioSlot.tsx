@@ -17,7 +17,7 @@ export default function PortfolioSlot({ fund, onSetWeight, onRemove, onToggleLoc
   const { ticker, weight, locked } = fund
   const color = colorOverride ?? meta.color
   const name = nameOverride ?? meta.name
-  const isCustom = ticker.startsWith('CUSTOM-') || ticker.startsWith('MCMERICA-')
+  const isCustom = ticker.startsWith('CUSTOM-')
 
   const sliderStyle: CSSProperties = {
     '--track-fill': color,

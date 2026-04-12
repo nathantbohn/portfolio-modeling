@@ -17,6 +17,7 @@ export const FUND_META: Record<string, { name: string; color: string }> = {
   VBR:  { name: 'Vanguard Small-Cap Value',     color: '#8B5E3C' },  // sienna
   GLD:  { name: 'SPDR Gold Shares',             color: '#B8960C' },  // gold
   DBC:  { name: 'Invesco DB Commodity Index',   color: '#7A6233' },  // dark amber
+  'MCMERICA-25': { name: 'McMerica 25',         color: '#6B4C2A' },  // warm brown
 }
 
 export interface Allocation {

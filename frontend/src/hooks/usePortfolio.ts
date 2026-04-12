@@ -4,6 +4,7 @@ import type { RebalanceFrequency } from '../utils/calculations'
 import { parseUrlState } from '../utils/urlState'
 
 export const ALL_TICKERS = [
+  'MCMERICA-25',
   'VOO', 'BND', 'VXUS', 'SCHD', 'SCHF',
   'SCHI', 'VTI', 'QQQ', 'BNDX', 'VBR',
   'GLD', 'DBC',
