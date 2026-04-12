@@ -7,9 +7,10 @@ interface AllocationPanelProps {
   onSetWeight: (ticker: string, weight: number) => void
   onRemove: (ticker: string) => void
   onToggleLock: (ticker: string) => void
+  customFundMeta?: Record<string, { name: string; color: string }>
 }
 
-export default function AllocationPanel({ activeFunds, onSetWeight, onRemove, onToggleLock }: AllocationPanelProps) {
+export default function AllocationPanel({ activeFunds, onSetWeight, onRemove, onToggleLock, customFundMeta }: AllocationPanelProps) {
   const total = activeFunds.reduce((s, f) => s + f.weight, 0)
   const sumOk = Math.abs(total - 100) < 0.01
 
@@ -48,16 +49,21 @@ export default function AllocationPanel({ activeFunds, onSetWeight, onRemove, on
           </div>
         ) : (
           <div className="space-y-1.5">
-            {activeFunds.map((fund) => (
-              <PortfolioSlot
-                key={fund.ticker}
-                fund={fund}
-                onSetWeight={onSetWeight}
-                onRemove={onRemove}
-                onToggleLock={onToggleLock}
-                canRemove={activeFunds.length > 1}
-              />
-            ))}
+            {activeFunds.map((fund) => {
+              const cm = customFundMeta?.[fund.ticker]
+              return (
+                <PortfolioSlot
+                  key={fund.ticker}
+                  fund={fund}
+                  onSetWeight={onSetWeight}
+                  onRemove={onRemove}
+                  onToggleLock={onToggleLock}
+                  canRemove={activeFunds.length > 1}
+                  nameOverride={cm?.name}
+                  colorOverride={cm?.color}
+                />
+              )
+            })}
           </div>
         )}
       </div>

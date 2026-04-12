@@ -8,11 +8,14 @@ interface PortfolioSlotProps {
   onRemove: (ticker: string) => void
   onToggleLock: (ticker: string) => void
   canRemove: boolean
+  nameOverride?: string
+  colorOverride?: string
 }
 
-export default function PortfolioSlot({ fund, onSetWeight, onRemove, onToggleLock, canRemove }: PortfolioSlotProps) {
+export default function PortfolioSlot({ fund, onSetWeight, onRemove, onToggleLock, canRemove, nameOverride, colorOverride }: PortfolioSlotProps) {
   const meta = FUND_META[fund.ticker] ?? { name: fund.ticker, color: '#990F3D' }
-  const { color, name } = meta
+  const color = colorOverride ?? meta.color
+  const name = nameOverride ?? meta.name
   const { ticker, weight, locked } = fund
 
   const sliderStyle: CSSProperties = {

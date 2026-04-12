@@ -35,6 +35,20 @@ export type PriceData = Record<string, PricePoint[]>
 
 export type ReturnSeries = { date: string; value: number }[]
 
+export interface CustomFundStock {
+  ticker: string
+  name: string
+  weight: number // 0–100
+}
+
+export interface CustomFund {
+  id: string // "CUSTOM-<nanoid>" — must not collide with real tickers
+  name: string
+  color: string
+  stocks: CustomFundStock[]
+  weightMode: 'equal' | 'manual'
+}
+
 export interface PortfolioStats {
   cagr: number
   annualizedVolatility: number

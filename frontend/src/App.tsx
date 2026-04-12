@@ -2,7 +2,10 @@ import { useCallback, useMemo, useState } from 'react'
 import { DndContext, type DragEndEvent } from '@dnd-kit/core'
 import { usePortfolio } from './hooks/usePortfolio'
 import { usePriceData } from './hooks/usePriceData'
+import { useCustomFunds } from './hooks/useCustomFunds'
+import { useStockPrices } from './hooks/useStockPrices'
 import { computePortfolio, computeBenchmark, calcRollingReturns, computeChartBounds, type RebalanceFrequency } from './utils/calculations'
+import { synthesizePriceData } from './utils/synthesize'
 import FundTray from './components/FundTray'
 import AllocationPanel from './components/AllocationPanel'
 import ToggleSwitch from './components/ToggleSwitch'
@@ -13,6 +16,7 @@ import AnnualReturnsChart from './components/AnnualReturnsChart'
 import RollingReturnsChart from './components/RollingReturnsChart'
 import ResizablePanel from './components/ResizablePanel'
 import PresetPortfolios from './components/PresetPortfolios'
+import CustomFundBuilder from './components/CustomFundBuilder'
 import { parseUrlState, buildShareUrl } from './utils/urlState'
 
 export default function App() {
@@ -34,6 +38,45 @@ export default function App() {
   } = usePortfolio()
 
   const { data: priceData, loading, error } = usePriceData()
+  const { customFunds, addCustomFund } = useCustomFunds()
+  const [showBuilder, setShowBuilder] = useState(false)
+
+  // Determine which stock tickers need fetching for active custom funds
+  const stockTickersToFetch = useMemo(() => {
+    const activeCustomIds = new Set(activeFunds.map((f) => f.ticker).filter((t) => t.startsWith('CUSTOM-')))
+    const tickers = new Set<string>()
+    for (const fund of customFunds) {
+      if (activeCustomIds.has(fund.id)) {
+        for (const s of fund.stocks) tickers.add(s.ticker)
+      }
+    }
+    return [...tickers]
+  }, [activeFunds, customFunds])
+
+  const { data: stockPrices } = useStockPrices(stockTickersToFetch)
+
+  // Merge synthesized custom fund price data with base price data
+  const mergedPriceData = useMemo(() => {
+    if (!priceData) return null
+    const activeCustomIds = new Set(activeFunds.map((f) => f.ticker).filter((t) => t.startsWith('CUSTOM-')))
+    if (activeCustomIds.size === 0) return priceData
+
+    const merged = { ...priceData }
+    for (const fund of customFunds) {
+      if (activeCustomIds.has(fund.id)) {
+        const synth = synthesizePriceData(fund, stockPrices)
+        if (synth.length > 0) merged[fund.id] = synth
+      }
+    }
+    return merged
+  }, [priceData, activeFunds, customFunds, stockPrices])
+
+  // Build metadata map for custom funds (used by AllocationPanel, PieChart)
+  const customFundMeta = useMemo(() => {
+    const map: Record<string, { name: string; color: string }> = {}
+    for (const f of customFunds) map[f.id] = { name: f.name, color: f.color }
+    return map
+  }, [customFunds])
 
   const [urlInit] = useState(() => parseUrlState())
   const [showBenchmark, setShowBenchmark] = useState(urlInit.benchmark ?? false)
@@ -63,23 +106,23 @@ export default function App() {
   const isFull = activeFunds.length >= 4
 
   const result = useMemo(() => {
-    if (!priceData) return null
+    if (!mergedPriceData) return null
     return computePortfolio(
       activeFunds,
-      priceData,
+      mergedPriceData,
       { rebalanceFrequency, useTotalReturn, monthlyContribution },
       principal,
     )
-  }, [activeFunds, priceData, rebalanceFrequency, useTotalReturn, monthlyContribution, principal])
+  }, [activeFunds, mergedPriceData, rebalanceFrequency, useTotalReturn, monthlyContribution, principal])
 
   const chartBounds = useMemo(() => {
-    if (!priceData) return null
+    if (!mergedPriceData) return null
     return computeChartBounds(
-      priceData,
+      mergedPriceData,
       { rebalanceFrequency, useTotalReturn, monthlyContribution },
       principal,
     )
-  }, [priceData, rebalanceFrequency, useTotalReturn, monthlyContribution, principal])
+  }, [mergedPriceData, rebalanceFrequency, useTotalReturn, monthlyContribution, principal])
 
   const rollingData = useMemo(() => {
     if (!result) return []
@@ -87,10 +130,10 @@ export default function App() {
   }, [result, rollingWindow])
 
   const benchmarkData = useMemo(() => {
-    if (!showBenchmark || !priceData || !result || result.cumulativeValues.length === 0) return []
+    if (!showBenchmark || !mergedPriceData || !result || result.cumulativeValues.length === 0) return []
     const dates = result.cumulativeValues.map((p) => p.date)
-    return computeBenchmark(priceData, useTotalReturn, dates, principal, monthlyContribution)
-  }, [showBenchmark, priceData, result, useTotalReturn, principal, monthlyContribution])
+    return computeBenchmark(mergedPriceData, useTotalReturn, dates, principal, monthlyContribution)
+  }, [showBenchmark, mergedPriceData, result, useTotalReturn, principal, monthlyContribution])
 
   function onDragEnd(event: DragEndEvent) {
     const { over, active } = event
@@ -236,12 +279,18 @@ export default function App() {
             {/* Scrollable controls area */}
             <div className="flex-1 min-h-0 overflow-y-auto">
               <PresetPortfolios onSelect={setFunds} />
-              <FundTray activeTickers={activeTickers} isFull={isFull} />
+              <FundTray
+                activeTickers={activeTickers}
+                isFull={isFull}
+                customFunds={customFunds}
+                onOpenBuilder={() => setShowBuilder(true)}
+              />
               <AllocationPanel
                 activeFunds={activeFunds}
                 onSetWeight={setWeight}
                 onRemove={removeFund}
                 onToggleLock={toggleLock}
+                customFundMeta={customFundMeta}
               />
             </div>
             </div>
@@ -288,6 +337,15 @@ export default function App() {
           </main>
         </div>
       </div>
+      {showBuilder && (
+        <CustomFundBuilder
+          onClose={() => setShowBuilder(false)}
+          onCreate={(draft) => {
+            addCustomFund(draft)
+            setShowBuilder(false)
+          }}
+        />
+      )}
     </DndContext>
   )
 }
