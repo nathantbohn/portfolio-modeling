@@ -15,7 +15,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from db import get_all_tickers, get_prices_by_ticker, init_db
+from db import get_all_tickers, get_prices_by_ticker, init_db, search_metadata
 
 DEFAULT_ORIGINS = "http://localhost:3000,http://localhost:5173"
 ALLOWED_ORIGINS = [
@@ -69,6 +69,20 @@ def get_all_prices() -> dict[str, list[PricePoint]]:
         ]
         for ticker in tickers
     }
+
+
+class MetadataResult(BaseModel):
+    ticker: str
+    name: str
+    sector: str
+
+
+@app.get("/search", response_model=list[MetadataResult])
+def search_stocks(q: str = "") -> list[MetadataResult]:
+    if not q or len(q) < 1:
+        return []
+    rows = search_metadata(q.upper(), limit=10)
+    return [MetadataResult(ticker=r["ticker"], name=r["name"], sector=r["sector"]) for r in rows]
 
 
 @app.get("/health")

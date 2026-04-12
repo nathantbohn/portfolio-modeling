@@ -22,6 +22,13 @@ def init_db() -> None:
             )
         """)
         conn.execute("CREATE INDEX IF NOT EXISTS idx_prices_ticker ON prices (ticker)")
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS metadata (
+                ticker TEXT PRIMARY KEY,
+                name   TEXT NOT NULL,
+                sector TEXT NOT NULL
+            )
+        """)
         conn.commit()
 
 
@@ -50,3 +57,39 @@ def get_all_tickers() -> list[str]:
     with get_connection() as conn:
         rows = conn.execute("SELECT DISTINCT ticker FROM prices ORDER BY ticker").fetchall()
         return [r["ticker"] for r in rows]
+
+
+def upsert_metadata(rows: list[dict]) -> None:
+    """Insert or replace metadata rows. Each dict must have ticker, name, sector."""
+    with get_connection() as conn:
+        conn.executemany(
+            """
+            INSERT OR REPLACE INTO metadata (ticker, name, sector)
+            VALUES (:ticker, :name, :sector)
+            """,
+            rows,
+        )
+        conn.commit()
+
+
+def search_metadata(query: str, limit: int = 10) -> list[sqlite3.Row]:
+    with get_connection() as conn:
+        pattern = f"%{query}%"
+        return conn.execute(
+            """
+            SELECT ticker, name, sector FROM metadata
+            WHERE ticker LIKE ? OR name LIKE ?
+            ORDER BY
+                CASE WHEN ticker LIKE ? THEN 0 ELSE 1 END,
+                ticker
+            LIMIT ?
+            """,
+            (pattern, pattern, f"{query}%", limit),
+        ).fetchall()
+
+
+def get_tickers_in_db() -> set[str]:
+    """Return the set of tickers that already have price data."""
+    with get_connection() as conn:
+        rows = conn.execute("SELECT DISTINCT ticker FROM prices").fetchall()
+        return {r["ticker"] for r in rows}
