@@ -17,6 +17,8 @@ import RollingReturnsChart from './components/RollingReturnsChart'
 import ResizablePanel from './components/ResizablePanel'
 import PresetPortfolios from './components/PresetPortfolios'
 import CustomFundBuilder from './components/CustomFundBuilder'
+import TickerBanner from './components/TickerBanner'
+import { MCMERICA_25, MCMERICA_25_ID, MCMERICA_25_TICKERS, MCMERICA_25_COLOR } from './config/mcmerica25'
 import { parseUrlState, buildShareUrl } from './utils/urlState'
 
 export default function App() {
@@ -41,10 +43,10 @@ export default function App() {
   const { customFunds, addCustomFund } = useCustomFunds()
   const [showBuilder, setShowBuilder] = useState(false)
 
-  // Determine which stock tickers need fetching for active custom funds
+  // Determine which stock tickers need fetching — always include McMerica 25 + active custom funds
   const stockTickersToFetch = useMemo(() => {
+    const tickers = new Set<string>(MCMERICA_25_TICKERS)
     const activeCustomIds = new Set(activeFunds.map((f) => f.ticker).filter((t) => t.startsWith('CUSTOM-')))
-    const tickers = new Set<string>()
     for (const fund of customFunds) {
       if (activeCustomIds.has(fund.id)) {
         for (const s of fund.stocks) tickers.add(s.ticker)
@@ -55,13 +57,25 @@ export default function App() {
 
   const { data: stockPrices } = useStockPrices(stockTickersToFetch)
 
-  // Merge synthesized custom fund price data with base price data
+  // Synthesize McMerica 25 price data
+  const mcmericaPriceData = useMemo(() => {
+    if (Object.keys(stockPrices).length === 0) return null
+    const synth = synthesizePriceData(MCMERICA_25, stockPrices)
+    return synth.length > 0 ? synth : null
+  }, [stockPrices])
+
+  // Merge synthesized custom fund + McMerica price data with base price data
   const mergedPriceData = useMemo(() => {
     if (!priceData) return null
-    const activeCustomIds = new Set(activeFunds.map((f) => f.ticker).filter((t) => t.startsWith('CUSTOM-')))
-    if (activeCustomIds.size === 0) return priceData
-
     const merged = { ...priceData }
+
+    // Always include McMerica 25
+    if (mcmericaPriceData) merged[MCMERICA_25_ID] = mcmericaPriceData
+
+    // Include active custom funds
+    const activeCustomIds = new Set(
+      activeFunds.map((f) => f.ticker).filter((t) => t.startsWith('CUSTOM-')),
+    )
     for (const fund of customFunds) {
       if (activeCustomIds.has(fund.id)) {
         const synth = synthesizePriceData(fund, stockPrices)
@@ -69,11 +83,13 @@ export default function App() {
       }
     }
     return merged
-  }, [priceData, activeFunds, customFunds, stockPrices])
+  }, [priceData, mcmericaPriceData, activeFunds, customFunds, stockPrices])
 
-  // Build metadata map for custom funds (used by AllocationPanel, PieChart)
+  // Build metadata map for custom funds + McMerica (used by AllocationPanel, PieChart)
   const customFundMeta = useMemo(() => {
-    const map: Record<string, { name: string; color: string }> = {}
+    const map: Record<string, { name: string; color: string }> = {
+      [MCMERICA_25_ID]: { name: 'McMerica 25', color: MCMERICA_25_COLOR },
+    }
     for (const f of customFunds) map[f.id] = { name: f.name, color: f.color }
     return map
   }, [customFunds])
@@ -145,6 +161,9 @@ export default function App() {
   return (
     <DndContext onDragEnd={onDragEnd}>
       <div className="h-screen flex flex-col bg-surface-0 text-warm-50 overflow-hidden">
+
+        {/* ── Ticker Banner ────────────────────────────────────────── */}
+        <TickerBanner priceData={mcmericaPriceData} />
 
         {/* ── Header ────────────────────────────────────────────────── */}
         <header className="flex-shrink-0 flex items-center justify-between px-5 h-11 border-b border-border">
@@ -283,6 +302,12 @@ export default function App() {
                 activeTickers={activeTickers}
                 isFull={isFull}
                 customFunds={customFunds}
+                mcmerica={{
+                  id: MCMERICA_25_ID,
+                  name: 'McMerica 25',
+                  color: MCMERICA_25_COLOR,
+                  ready: mcmericaPriceData != null,
+                }}
                 onOpenBuilder={() => setShowBuilder(true)}
               />
               <AllocationPanel

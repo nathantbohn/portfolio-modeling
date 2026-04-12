@@ -14,10 +14,10 @@ interface PortfolioSlotProps {
 
 export default function PortfolioSlot({ fund, onSetWeight, onRemove, onToggleLock, canRemove, nameOverride, colorOverride }: PortfolioSlotProps) {
   const meta = FUND_META[fund.ticker] ?? { name: fund.ticker, color: '#990F3D' }
+  const { ticker, weight, locked } = fund
   const color = colorOverride ?? meta.color
   const name = nameOverride ?? meta.name
-  const isCustom = ticker.startsWith('CUSTOM-')
-  const { ticker, weight, locked } = fund
+  const isCustom = ticker.startsWith('CUSTOM-') || ticker.startsWith('MCMERICA-')
 
   const sliderStyle: CSSProperties = {
     '--track-fill': color,
