@@ -61,11 +61,11 @@ export default function PortfolioSlot({ fund, onSetWeight, onRemove, onToggleLoc
             )}
           </div>
 
-          <div className="flex items-center gap-0.5 flex-shrink-0 ml-1">
+          <div className="flex items-center gap-1 sm:gap-0.5 flex-shrink-0 ml-1">
             <button
               onClick={() => onToggleLock(ticker)}
               className={[
-                'transition-colors p-0.5 rounded flex-shrink-0',
+                'transition-colors p-2 sm:p-0.5 rounded flex-shrink-0',
                 locked
                   ? 'text-warm-100 hover:text-warm-50'
                   : 'text-warm-400 hover:text-warm-200 hover:bg-surface-2',
@@ -88,7 +88,7 @@ export default function PortfolioSlot({ fund, onSetWeight, onRemove, onToggleLoc
             <button
               onClick={() => onRemove(ticker)}
               disabled={!canRemove}
-              className="text-warm-300 hover:text-warm-50 disabled:opacity-20 disabled:cursor-not-allowed transition-colors p-0.5 rounded hover:bg-surface-2 flex-shrink-0"
+              className="text-warm-300 hover:text-warm-50 disabled:opacity-20 disabled:cursor-not-allowed transition-colors p-2 sm:p-0.5 rounded hover:bg-surface-2 flex-shrink-0"
               aria-label={`Remove ${ticker}`}
               type="button"
             >
@@ -129,7 +129,7 @@ export default function PortfolioSlot({ fund, onSetWeight, onRemove, onToggleLoc
                 const v = parseFloat(e.target.value)
                 if (!isNaN(v)) onSetWeight(ticker, v)
               }}
-              className="w-[52px] bg-surface-1 border border-border rounded px-1.5 py-0.5 text-[11px] font-mono text-warm-50 text-right tabular-nums focus:outline-none focus:border-warm-300 transition-colors disabled:opacity-50"
+              className="w-[52px] bg-surface-1 border border-border rounded px-1.5 py-1.5 sm:py-0.5 text-[11px] font-mono text-warm-50 text-right tabular-nums focus:outline-none focus:border-warm-300 transition-colors disabled:opacity-50 min-h-[44px] sm:min-h-0"
             />
             <span className="text-warm-300 text-[11px]">%</span>
           </div>

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { DndContext, type DragEndEvent } from '@dnd-kit/core'
 import { usePortfolio, ALL_TICKERS } from './hooks/usePortfolio'
 import { usePriceData } from './hooks/usePriceData'
@@ -37,6 +37,14 @@ export default function App() {
     monthlyContribution,
     setMonthlyContribution,
   } = usePortfolio()
+
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)')
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
 
   const { data: priceData, loading, error } = usePriceData()
   const { customFunds, addCustomFund } = useCustomFunds()
@@ -87,7 +95,12 @@ export default function App() {
   const [rollingWindow, setRollingWindow] = useState<12 | 36 | 60>(urlInit.rolling ?? 12)
   const [copied, setCopied] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
-    try { return localStorage.getItem('sidebar-collapsed') === 'true' } catch { return false }
+    try {
+      const stored = localStorage.getItem('sidebar-collapsed')
+      if (stored !== null) return stored === 'true'
+      // Default collapsed on mobile
+      return window.innerWidth < 768
+    } catch { return false }
   })
 
   const handleShare = useCallback(() => {
@@ -178,12 +191,19 @@ export default function App() {
         </header>
 
         {/* ── Body ──────────────────────────────────────────────────── */}
-        <div className="flex flex-1 min-h-0">
+        <div className="flex flex-col md:flex-row flex-1 min-h-0">
 
           {/* ── Left Control Panel ──────────────────────────────────── */}
           <aside
-            className="flex-shrink-0 border-r border-border flex min-h-0 bg-surface-1 transition-[width] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] relative"
-            style={{ width: sidebarCollapsed ? 32 : 320 }}
+            className={[
+              'flex-shrink-0 border-border flex min-h-0 bg-surface-1 transition-[width,max-height] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] relative',
+              sidebarCollapsed ? 'overflow-hidden' : '',
+              isMobile ? 'border-b w-full' : 'border-r',
+            ].join(' ')}
+            style={isMobile
+              ? { maxHeight: sidebarCollapsed ? 32 : '50vh' }
+              : { width: sidebarCollapsed ? 32 : 320 }
+            }
           >
             {/* Collapse toggle */}
             <button
@@ -192,14 +212,20 @@ export default function App() {
                 setSidebarCollapsed(next)
                 try { localStorage.setItem('sidebar-collapsed', String(next)) } catch { /* */ }
               }}
-              className="absolute top-2 right-0 translate-x-1/2 z-10 w-5 h-5 rounded-full bg-surface-1 border border-border flex items-center justify-center text-warm-300 hover:text-warm-50 hover:bg-surface-2 transition-colors"
+              className={[
+                'absolute z-10 w-5 h-5 rounded-full bg-surface-1 border border-border flex items-center justify-center text-warm-300 hover:text-warm-50 hover:bg-surface-2 transition-colors',
+                isMobile ? 'bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2' : 'top-2 right-0 translate-x-1/2',
+              ].join(' ')}
               aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
               type="button"
             >
               <svg
                 width="10" height="10" viewBox="0 0 10 10" fill="none"
                 className="transition-transform duration-300"
-                style={{ transform: sidebarCollapsed ? 'rotate(180deg)' : '' }}
+                style={{ transform: isMobile
+                  ? (sidebarCollapsed ? 'rotate(-90deg)' : 'rotate(90deg)')
+                  : (sidebarCollapsed ? 'rotate(180deg)' : '')
+                }}
               >
                 <path d="M6.5 2L3.5 5L6.5 8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
@@ -305,11 +331,11 @@ export default function App() {
           </aside>
 
           {/* ── Visualization Area ──────────────────────────────────── */}
-          <main className="flex-1 min-w-0 overflow-y-auto p-4 space-y-0">
+          <main className="flex-1 min-w-0 overflow-y-auto p-3 sm:p-4 space-y-0">
 
             {/* Top row: pie chart + stats */}
-            <div className="flex gap-3 flex-shrink-0 mb-3" style={{ height: '240px' }}>
-              <div className="flex items-center justify-center flex-shrink-0 w-[220px]">
+            <div className="flex flex-col sm:flex-row gap-3 flex-shrink-0 mb-3 sm:h-[240px]">
+              <div className="flex items-center justify-center flex-shrink-0 sm:w-[220px]">
                 <PieChart allocations={activeFunds} />
               </div>
               <div className="flex-1 min-w-0">

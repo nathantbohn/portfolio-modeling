@@ -12,7 +12,7 @@ export default function ToggleSwitch({ checked, onChange, label }: ToggleSwitchP
       role="switch"
       aria-checked={checked}
       onClick={() => onChange(!checked)}
-      className="flex items-center gap-2 cursor-pointer group"
+      className="flex items-center gap-2 cursor-pointer group min-h-[44px] sm:min-h-0"
       type="button"
     >
       <div

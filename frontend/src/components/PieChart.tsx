@@ -156,7 +156,7 @@ export default function PieChart({ allocations }: PieChartProps) {
         width={SIZE}
         height={SIZE}
         viewBox={`0 0 ${SIZE} ${SIZE}`}
-        className="overflow-visible"
+        className="overflow-visible max-w-[160px] max-h-[160px] sm:max-w-none sm:max-h-none"
       >
         {wedges.map((w) => (
           <WedgePath key={w.ticker} wedge={w} innerR={innerR} />

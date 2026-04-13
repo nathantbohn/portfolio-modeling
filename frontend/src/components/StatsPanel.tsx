@@ -46,7 +46,7 @@ function fmtDollar(n: number): string {
 export default function StatsPanel({ result, principal }: StatsPanelProps) {
   if (!result || result.cumulativeValues.length === 0) {
     return (
-      <div className="grid grid-cols-2 gap-2 h-full content-center">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 h-full content-center">
         {['CAGR', 'Volatility', 'Max Drawdown', 'Sharpe Ratio'].map((label) => (
           <StatCard key={label} label={label} value="--" color="neutral" />
         ))}
@@ -58,7 +58,7 @@ export default function StatsPanel({ result, principal }: StatsPanelProps) {
   const finalValue = cumulativeValues[cumulativeValues.length - 1]?.value ?? principal
 
   return (
-    <div className="grid grid-cols-2 gap-2 h-full content-center">
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 h-full content-center">
       <StatCard
         label={useIRR ? 'IRR' : 'CAGR'}
         value={fmt(cagr)}

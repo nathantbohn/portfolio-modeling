@@ -79,7 +79,7 @@ export default function TickerBanner({ priceData }: TickerBannerProps) {
   }
 
   return (
-    <div className="flex-shrink-0 h-7 bg-[#1a1a1a] flex items-center justify-center gap-6 px-4 overflow-hidden whitespace-nowrap">
+    <div className="flex-shrink-0 h-7 bg-[#1a1a1a] flex items-center justify-start sm:justify-center gap-6 px-4 overflow-x-auto overflow-y-hidden whitespace-nowrap scrollbar-hide">
       {indices.mc && <IndexItem label="McMerica 25" idx={indices.mc} />}
       {indices.mc && indices.sp && <span className="text-white/20">|</span>}
       {indices.sp && <IndexItem label="S&P 500" idx={indices.sp} />}

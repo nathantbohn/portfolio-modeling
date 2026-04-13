@@ -45,7 +45,7 @@ function DraggableFund({
       {...attributes}
       style={style}
       className={[
-        'flex items-center gap-2 px-2.5 py-[7px] rounded-md transition-colors duration-100 select-none',
+        'flex items-center gap-2 px-2.5 py-[7px] sm:py-[7px] min-h-[44px] sm:min-h-0 rounded-md transition-colors duration-100 select-none',
         isCustom ? 'border border-dashed border-warm-400/30' : '',
         isDragging
           ? 'bg-surface-2 shadow-lg ring-1 ring-border'
@@ -110,7 +110,7 @@ export default function FundTray({ activeTickers, isFull, customFunds, onOpenBui
         )}
       </div>
 
-      <div className="p-1.5 space-y-px">
+      <div className="p-1.5 space-y-px max-h-[40vh] sm:max-h-none overflow-y-auto">
         {ALL_TICKERS.map((ticker) => {
           const isActive = activeTickers.has(ticker)
           const disabled = isActive || isFull
