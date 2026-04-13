@@ -5,7 +5,8 @@
       "Bash(echo \"Exit: $?\")",
       "Bash(npx vite:*)",
       "Bash(pkill -f \"vite\")",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(python:*)"
     ]
   }
 }
