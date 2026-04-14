@@ -379,32 +379,38 @@ export default function CumulativeChart({ data, capitalInvested, dividendData, b
       if (tooltip) {
         const portfolioLabel = showDividend ? 'Price Return' : 'Portfolio'
         const portfolioColor = ACCENT
-        const returnPct = pt.value / startValue - 1
         let html = `<div style="font-size:11px;font-weight:600;margin-bottom:4px">${dateFmt(pt.date)}</div>`
         html += `<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">`
         html += `<span style="display:inline-block;width:8px;height:3px;border-radius:1px;background:${portfolioColor};flex-shrink:0"></span>`
         html += `<span>${portfolioLabel}</span>`
         html += `<span style="margin-left:auto;font-weight:600">${dollarFmt(pt.value)}</span>`
-        html += `<span style="color:${returnPct >= 0 ? '#1D7B45' : '#C0392B'}">${pctFmt(returnPct)}</span>`
+        if (startValue !== 0) {
+          const returnPct = pt.value / startValue - 1
+          html += `<span style="color:${returnPct >= 0 ? '#1D7B45' : '#C0392B'}">${pctFmt(returnPct)}</span>`
+        }
         html += `</div>`
 
         if (showDividend && divPt) {
-          const divReturn = divPt.value / divStartValue - 1
           html += `<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">`
           html += `<span style="display:inline-block;width:8px;height:3px;border-radius:1px;background:${DIVIDEND_COLOR};flex-shrink:0"></span>`
           html += `<span>Dividends</span>`
           html += `<span style="margin-left:auto;font-weight:600">${dollarFmt(divPt.value)}</span>`
-          html += `<span style="color:${divReturn >= 0 ? '#1D7B45' : '#C0392B'}">${pctFmt(divReturn)}</span>`
+          if (divStartValue !== 0) {
+            const divReturn = divPt.value / divStartValue - 1
+            html += `<span style="color:${divReturn >= 0 ? '#1D7B45' : '#C0392B'}">${pctFmt(divReturn)}</span>`
+          }
           html += `</div>`
         }
 
         if (showBenchmark && bmPt) {
-          const bmReturn = bmPt.value / bmStartValue - 1
           html += `<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">`
           html += `<span style="display:inline-block;width:8px;height:3px;border-radius:1px;background:${BENCHMARK_COLOR};flex-shrink:0"></span>`
           html += `<span>S&P 500</span>`
           html += `<span style="margin-left:auto;font-weight:600">${dollarFmt(bmPt.value)}</span>`
-          html += `<span style="color:${bmReturn >= 0 ? '#1D7B45' : '#C0392B'}">${pctFmt(bmReturn)}</span>`
+          if (bmStartValue !== 0) {
+            const bmReturn = bmPt.value / bmStartValue - 1
+            html += `<span style="color:${bmReturn >= 0 ? '#1D7B45' : '#C0392B'}">${pctFmt(bmReturn)}</span>`
+          }
           html += `</div>`
         }
 
