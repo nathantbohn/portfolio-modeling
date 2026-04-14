@@ -70,6 +70,23 @@ export default function TickerBanner({ priceData }: TickerBannerProps) {
     return { mc, sp, dow }
   }, [priceData])
 
+  const asOfDate = useMemo(() => {
+    if (!priceData) return null
+    let latest = ''
+    for (const ticker of Object.keys(priceData)) {
+      const pts = priceData[ticker]
+      if (pts.length > 0) {
+        const last = pts[pts.length - 1].date
+        if (last > latest) latest = last
+      }
+    }
+    if (!latest) return null
+    const [y, m] = latest.split('-').map(Number)
+    const d = new Date(y, m - 1, 1)
+    const fmt = d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+    return fmt
+  }, [priceData])
+
   if (!indices || (!indices.mc && !indices.sp && !indices.dow)) {
     return (
       <div className="flex-shrink-0 h-7 bg-[#1a1a1a] flex items-center justify-center">
@@ -85,6 +102,14 @@ export default function TickerBanner({ priceData }: TickerBannerProps) {
       {indices.sp && <IndexItem label="S&P 500" idx={indices.sp} />}
       {indices.sp && indices.dow && <span className="text-white/20">|</span>}
       {indices.dow && <IndexItem label="Dow" idx={indices.dow} decimals={0} />}
+      {asOfDate && (
+        <>
+          <span className="text-white/20 hidden sm:inline">|</span>
+          <span className="text-[10px] text-white/30 hidden sm:inline" style={{ fontFamily: MONO }}>
+            as of {asOfDate}
+          </span>
+        </>
+      )}
     </div>
   )
 }
