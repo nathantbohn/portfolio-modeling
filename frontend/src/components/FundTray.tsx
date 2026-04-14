@@ -9,6 +9,7 @@ interface FundTrayProps {
   isFull: boolean
   customFunds: CustomFund[]
   onOpenBuilder: () => void
+  onAddFund?: (ticker: string) => void
 }
 
 function DraggableFund({
@@ -18,6 +19,7 @@ function DraggableFund({
   nameOverride,
   colorOverride,
   isCustom,
+  onAdd,
 }: {
   ticker: string
   disabled: boolean
@@ -25,6 +27,7 @@ function DraggableFund({
   nameOverride?: string
   colorOverride?: string
   isCustom?: boolean
+  onAdd?: (ticker: string) => void
 }) {
   const meta = FUND_META[ticker]
   const name = nameOverride ?? meta?.name ?? ticker
@@ -33,6 +36,8 @@ function DraggableFund({
     id: ticker,
     disabled,
   })
+
+  const canAdd = !disabled && onAdd
 
   const style = transform
     ? { transform: CSS.Translate.toString(transform), zIndex: 50 }
@@ -43,15 +48,16 @@ function DraggableFund({
       ref={setNodeRef}
       {...listeners}
       {...attributes}
+      onClick={canAdd ? () => onAdd(ticker) : undefined}
       style={style}
       className={[
         'flex items-center gap-2 px-2.5 py-[7px] sm:py-[7px] min-h-[44px] sm:min-h-0 rounded-md transition-colors duration-100 select-none',
         isCustom ? 'border border-dashed border-warm-400/30' : '',
         isDragging
-          ? 'bg-surface-2 shadow-lg ring-1 ring-border'
+          ? 'bg-surface-2 shadow-lg ring-1 ring-border opacity-50'
           : disabled
             ? 'opacity-30 cursor-not-allowed'
-            : 'hover:bg-surface-0 cursor-grab active:cursor-grabbing',
+            : 'hover:bg-surface-0 cursor-pointer',
       ].join(' ')}
     >
       {isCustom ? (
@@ -78,27 +84,22 @@ function DraggableFund({
         <span className="text-[10px] text-warm-300 flex-shrink-0">In use</span>
       )}
 
-      {!disabled && !isDragging && (
+      {canAdd && !isDragging && (
         <svg
           width="10"
           height="10"
           viewBox="0 0 12 12"
           fill="none"
-          className="flex-shrink-0 text-warm-400"
+          className="flex-shrink-0 text-warm-300"
         >
-          <circle cx="4" cy="3" r="1" fill="currentColor" />
-          <circle cx="4" cy="6" r="1" fill="currentColor" />
-          <circle cx="4" cy="9" r="1" fill="currentColor" />
-          <circle cx="8" cy="3" r="1" fill="currentColor" />
-          <circle cx="8" cy="6" r="1" fill="currentColor" />
-          <circle cx="8" cy="9" r="1" fill="currentColor" />
+          <path d="M6 2v8M2 6h8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
         </svg>
       )}
     </div>
   )
 }
 
-export default function FundTray({ activeTickers, isFull, customFunds, onOpenBuilder }: FundTrayProps) {
+export default function FundTray({ activeTickers, isFull, customFunds, onOpenBuilder, onAddFund }: FundTrayProps) {
   return (
     <div>
       <div className="p-1.5 space-y-px max-h-[40vh] sm:max-h-none overflow-y-auto">
@@ -111,6 +112,7 @@ export default function FundTray({ activeTickers, isFull, customFunds, onOpenBui
               ticker={ticker}
               disabled={disabled}
               isActive={isActive}
+              onAdd={onAddFund}
             />
           )
         })}
@@ -128,6 +130,7 @@ export default function FundTray({ activeTickers, isFull, customFunds, onOpenBui
               ticker={ticker}
               disabled={disabled}
               isActive={isActive}
+              onAdd={onAddFund}
             />
           )
         })}
@@ -148,6 +151,7 @@ export default function FundTray({ activeTickers, isFull, customFunds, onOpenBui
                   nameOverride={fund.name}
                   colorOverride={fund.color}
                   isCustom
+                  onAdd={onAddFund}
                 />
               )
             })}

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { DndContext, type DragEndEvent } from '@dnd-kit/core'
+import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors, type DragStartEvent, type DragEndEvent } from '@dnd-kit/core'
 import { usePortfolio, ALL_TICKERS } from './hooks/usePortfolio'
 import { usePriceData } from './hooks/usePriceData'
 import { useCustomFunds } from './hooks/useCustomFunds'
@@ -18,6 +18,7 @@ import ResizablePanel from './components/ResizablePanel'
 import PresetPortfolios from './components/PresetPortfolios'
 import CustomFundBuilder from './components/CustomFundBuilder'
 import TickerBanner from './components/TickerBanner'
+import { FUND_META } from './types'
 import { parseUrlState, buildShareUrl } from './utils/urlState'
 
 export default function App() {
@@ -37,6 +38,10 @@ export default function App() {
     monthlyContribution,
     setMonthlyContribution,
   } = usePortfolio()
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+  )
 
   const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
   useEffect(() => {
@@ -104,6 +109,7 @@ export default function App() {
   })
   const [presetsOpen, setPresetsOpen] = useState(false)
   const [fundsOpen, setFundsOpen] = useState(false)
+  const [activeDragId, setActiveDragId] = useState<string | null>(null)
 
   const handleShare = useCallback(() => {
     const url = buildShareUrl({
@@ -155,7 +161,12 @@ export default function App() {
     return computeBenchmark(mergedPriceData, useTotalReturn, dates, principal, monthlyContribution)
   }, [showBenchmark, mergedPriceData, result, useTotalReturn, principal, monthlyContribution])
 
+  function onDragStart(event: DragStartEvent) {
+    setActiveDragId(String(event.active.id))
+  }
+
   function onDragEnd(event: DragEndEvent) {
+    setActiveDragId(null)
     const { over, active } = event
     if (over?.id === 'portfolio') {
       addFund(String(active.id))
@@ -163,7 +174,7 @@ export default function App() {
   }
 
   return (
-    <DndContext onDragEnd={onDragEnd}>
+    <DndContext sensors={sensors} onDragStart={onDragStart} onDragEnd={onDragEnd}>
       <div className="h-screen flex flex-col bg-surface-0 text-warm-50 overflow-hidden">
 
         {/* ── Ticker Banner ────────────────────────────────────────── */}
@@ -360,6 +371,7 @@ export default function App() {
                     isFull={isFull}
                     customFunds={customFunds}
                     onOpenBuilder={() => setShowBuilder(true)}
+                    onAddFund={addFund}
                   />
                 )}
               </div>
@@ -428,6 +440,23 @@ export default function App() {
           }}
         />
       )}
+      <DragOverlay dropAnimation={null}>
+        {activeDragId ? (() => {
+          const meta = FUND_META[activeDragId]
+          const cm = customFundMeta[activeDragId]
+          const name = cm?.name ?? meta?.name ?? activeDragId
+          const color = cm?.color ?? meta?.color ?? '#990F3D'
+          return (
+            <div className="flex items-center gap-2 px-2.5 py-[7px] rounded-md bg-surface-2 shadow-lg ring-1 ring-border select-none">
+              <div className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
+              <span className="text-xs font-medium text-warm-50">{activeDragId.startsWith('CUSTOM-') ? name : activeDragId}</span>
+              {!activeDragId.startsWith('CUSTOM-') && (
+                <span className="text-[11px] text-warm-200">{name}</span>
+              )}
+            </div>
+          )
+        })() : null}
+      </DragOverlay>
     </DndContext>
   )
 }
