@@ -156,6 +156,14 @@ export default function CumulativeChart({ data, capitalInvested, dividendData, b
         .attr('r', 4).attr('fill', ACCENT).attr('stroke', '#fff')
         .attr('stroke-width', 1.5).attr('opacity', 0)
         .attr('pointer-events', 'none')
+      g.append('circle').attr('class', 'hover-dot-benchmark')
+        .attr('r', 3.5).attr('fill', BENCHMARK_COLOR).attr('stroke', '#fff')
+        .attr('stroke-width', 1.5).attr('opacity', 0)
+        .attr('pointer-events', 'none')
+      g.append('circle').attr('class', 'hover-dot-dividend')
+        .attr('r', 3.5).attr('fill', DIVIDEND_COLOR).attr('stroke', '#fff')
+        .attr('stroke-width', 1.5).attr('opacity', 0)
+        .attr('pointer-events', 'none')
       g.append('rect').attr('class', 'hover-overlay')
         .attr('width', w).attr('height', h)
         .attr('fill', 'none').attr('pointer-events', 'all')
@@ -318,19 +326,29 @@ export default function CumulativeChart({ data, capitalInvested, dividendData, b
       .attr('width', w).attr('height', h)
     const crosshair = g.select<SVGLineElement>('.crosshair')
     const hoverDot = g.select<SVGCircleElement>('.hover-dot')
+    const hoverDotBm = g.select<SVGCircleElement>('.hover-dot-benchmark')
+    const hoverDotDiv = g.select<SVGCircleElement>('.hover-dot-dividend')
     const tooltip = tooltipRef.current
     const bisect = d3.bisector<{ date: Date; value: number }, Date>((d) => d.date).left
     const startValue = parsed[0]?.value ?? principal
+    const bmStartValue = parsedBenchmark[0]?.value ?? principal
+    const divStartValue = parsedDividend[0]?.value ?? principal
+
+    function findNearest(arr: { date: Date; value: number }[], dateAtMouse: Date) {
+      let idx = bisect(arr, dateAtMouse, 1)
+      if (idx >= arr.length) idx = arr.length - 1
+      if (idx > 0) {
+        const d0 = arr[idx - 1], d1 = arr[idx]
+        if (+dateAtMouse - +d0.date < +d1.date - +dateAtMouse) idx = idx - 1
+      }
+      return idx
+    }
 
     overlay.on('mousemove', (event: MouseEvent) => {
       const [mx] = d3.pointer(event)
       const dateAtMouse = x.invert(mx)
-      let idx = bisect(parsed, dateAtMouse, 1)
-      if (idx >= parsed.length) idx = parsed.length - 1
-      if (idx > 0) {
-        const d0 = parsed[idx - 1], d1 = parsed[idx]
-        if (+dateAtMouse - +d0.date < +d1.date - +dateAtMouse) idx = idx - 1
-      }
+
+      const idx = findNearest(parsed, dateAtMouse)
       const pt = parsed[idx]
       const px = x(pt.date)
       const py = y(pt.value)
@@ -338,13 +356,66 @@ export default function CumulativeChart({ data, capitalInvested, dividendData, b
       crosshair.attr('x1', px).attr('x2', px).attr('y1', 0).attr('y2', h).attr('opacity', 1)
       hoverDot.attr('cx', px).attr('cy', py).attr('opacity', 1)
 
+      // Benchmark dot
+      let bmPt: { date: Date; value: number } | null = null
+      if (showBenchmark && parsedBenchmark.length > 0) {
+        const bmIdx = findNearest(parsedBenchmark, dateAtMouse)
+        bmPt = parsedBenchmark[bmIdx]
+        hoverDotBm.attr('cx', px).attr('cy', y(bmPt.value)).attr('opacity', 1)
+      } else {
+        hoverDotBm.attr('opacity', 0)
+      }
+
+      // Dividend dot
+      let divPt: { date: Date; value: number } | null = null
+      if (showDividend && parsedDividend.length > 0) {
+        const divIdx = findNearest(parsedDividend, dateAtMouse)
+        divPt = parsedDividend[divIdx]
+        hoverDotDiv.attr('cx', px).attr('cy', y(divPt.value)).attr('opacity', 1)
+      } else {
+        hoverDotDiv.attr('opacity', 0)
+      }
+
       if (tooltip) {
-        let html = `<div style="font-size:11px;font-weight:600;margin-bottom:3px">${dateFmt(pt.date)}</div>`
-        html += `<div>${dollarFmt(pt.value)}</div>`
-        html += `<div style="color:${pt.value >= startValue ? '#1D7B45' : '#C0392B'}">${pctFmt(pt.value / startValue - 1)} return</div>`
-        if (showCapital && idx < parsedCapital.length) {
-          html += `<div style="color:${AXIS_TEXT}">${dollarFmt(parsedCapital[idx].value)} invested</div>`
+        const portfolioLabel = showDividend ? 'Price Return' : 'Portfolio'
+        const portfolioColor = ACCENT
+        const returnPct = pt.value / startValue - 1
+        let html = `<div style="font-size:11px;font-weight:600;margin-bottom:4px">${dateFmt(pt.date)}</div>`
+        html += `<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">`
+        html += `<span style="display:inline-block;width:8px;height:3px;border-radius:1px;background:${portfolioColor};flex-shrink:0"></span>`
+        html += `<span>${portfolioLabel}</span>`
+        html += `<span style="margin-left:auto;font-weight:600">${dollarFmt(pt.value)}</span>`
+        html += `<span style="color:${returnPct >= 0 ? '#1D7B45' : '#C0392B'}">${pctFmt(returnPct)}</span>`
+        html += `</div>`
+
+        if (showDividend && divPt) {
+          const divReturn = divPt.value / divStartValue - 1
+          html += `<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">`
+          html += `<span style="display:inline-block;width:8px;height:3px;border-radius:1px;background:${DIVIDEND_COLOR};flex-shrink:0"></span>`
+          html += `<span>Dividends</span>`
+          html += `<span style="margin-left:auto;font-weight:600">${dollarFmt(divPt.value)}</span>`
+          html += `<span style="color:${divReturn >= 0 ? '#1D7B45' : '#C0392B'}">${pctFmt(divReturn)}</span>`
+          html += `</div>`
         }
+
+        if (showBenchmark && bmPt) {
+          const bmReturn = bmPt.value / bmStartValue - 1
+          html += `<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">`
+          html += `<span style="display:inline-block;width:8px;height:3px;border-radius:1px;background:${BENCHMARK_COLOR};flex-shrink:0"></span>`
+          html += `<span>S&P 500</span>`
+          html += `<span style="margin-left:auto;font-weight:600">${dollarFmt(bmPt.value)}</span>`
+          html += `<span style="color:${bmReturn >= 0 ? '#1D7B45' : '#C0392B'}">${pctFmt(bmReturn)}</span>`
+          html += `</div>`
+        }
+
+        if (showCapital && idx < parsedCapital.length) {
+          html += `<div style="display:flex;align-items:center;gap:6px;color:${AXIS_TEXT}">`
+          html += `<span style="display:inline-block;width:8px;height:3px;border-radius:1px;background:${CAPITAL_COLOR};flex-shrink:0"></span>`
+          html += `<span>Invested</span>`
+          html += `<span style="margin-left:auto;font-weight:600">${dollarFmt(parsedCapital[idx].value)}</span>`
+          html += `</div>`
+        }
+
         tooltip.innerHTML = html
         tooltip.style.opacity = '1'
         // Position: flip if near right edge
@@ -360,6 +431,8 @@ export default function CumulativeChart({ data, capitalInvested, dividendData, b
     overlay.on('mouseleave', () => {
       crosshair.attr('opacity', 0)
       hoverDot.attr('opacity', 0)
+      hoverDotBm.attr('opacity', 0)
+      hoverDotDiv.attr('opacity', 0)
       if (tooltip) tooltip.style.opacity = '0'
     })
 
