@@ -1,157 +1,142 @@
-# Portfolio Backtester
+Portfolio Backtester & Custom Index Platform
+What This Is
+A real-time, interactive portfolio backtesting tool with a custom index builder. Users drag sliders to adjust fund allocations and watch charts, stats, and a pie chart animate continuously during the drag — not on release, not on submit. The core differentiator vs. competitors (Portfolio Visualizer, PortfolioMetrics, Testfolio) is the tactile, slider-driven exploration loop where everything updates live.
+The deeper value proposition: users can build their own indices from individual stocks, backtest those custom indices against real benchmarks (Dow, S&P 500), and slot them into a portfolio model as simulated ETFs alongside real ones. This two-layer abstraction — pick stocks → build index → slot into portfolio — is what makes the product genuinely different.
+Live at: callibratedindex.space (working domain)
+Frontend: Vercel (auto-deploys from main branch)
+Backend: Render free tier (auto-deploys from backend-deploy branch)
+Tech Stack
+Frontend
 
-## Project Overview
+React 19 + TypeScript
+Vite 6 (build tool + dev server)
+Tailwind CSS v3
+Framer Motion (pie chart animations, transitions)
+D3.js (cumulative returns line chart, annual returns bar chart, rolling returns chart)
+@dnd-kit (drag-and-drop fund selection — replaced @hello-pangea/dnd due to React 19 incompatibility)
 
-A real-time, interactive portfolio backtesting tool. The core interaction: users drag sliders to adjust fund allocations and watch performance charts, stats, and a pie chart animate continuously during the drag — not on release. Everything feels alive and connected. Think Anduril, Linear, Vercel-level polish.
+Backend
 
-This is NOT a form-and-submit backtester like Portfolio Visualizer. The differentiator is the tactile, slider-driven exploration experience that builds intuition about how allocation shifts affect returns and risk.
+Python + FastAPI
+SQLite (prices.db — ETFs, mutual funds, ~500 S&P 500 stocks, McMerica 25 constituents)
+yfinance (data download and monthly refresh)
+Backend serves individual stock price data for custom index builder
+Frontend also loads 12 ETFs + 5 mutual funds from static JSON (frontend/public/data/prices.json)
 
-## Design Benchmarks
+Deployment
 
-Reference these sites for motion, typography, and overall feel:
-- Anduril.com (sleek transitions, premium feel)
-- Linear.app (snappy, responsive UI)
-- Vercel.com (clean data presentation)
+Frontend: Vercel, build command npx vite build, output dist, root frontend
+Backend: Render, auto-deploys from backend-deploy branch
+Frontend reaches backend via VITE_API_URL environment variable
+CORS configured between Vercel and Render origins
 
-All chart and pie animations must use easing curves (e.g. `cubic-bezier(0.16, 1, 0.3, 1)`) for a snappy-but-smooth feel. Pie chart wedges should morph/interpolate between states, not redraw. Line graph should smoothly transition between states. Target 60fps — portfolio calculations must run in under 16ms.
+Critical Constraints — Read Before Every Change
+1. Slider Interaction Is Sacred
 
-## Tech Stack
+Slider onChange fires on every frame during drag. NO debouncing. NO "apply" buttons. NO delayed recomputation.
+The entire product promise is real-time feedback. If a change would add latency to the slider → chart update loop, it must be justified explicitly.
+Portfolio calculations must run in <16ms to maintain 60fps during drag.
 
-### Frontend
-- **React + TypeScript**
-- **Framer Motion** for continuous, smooth animations (pie chart morphing, chart transitions, slider interactions)
-- **D3.js** for the cumulative returns line graph and annualized returns bar chart (full control over per-frame animation; do NOT use off-the-shelf chart libraries that resist mid-drag animation)
-- **Tailwind CSS** for styling
-- **react-beautiful-dnd** (or equivalent) for drag-and-drop fund selection
+2. Animation Rules
 
-### Backend
-- **Python + FastAPI** — thin API layer that serves stored price data as JSON
-- **SQLite** — single-file storage for price data; simple, zero-config, built into Python
-- **yfinance** — for bulk historical data download and monthly refresh script
+Pie chart: Framer Motion animate prop. Animate arc angles. Do NOT unmount/remount slices — this causes flicker during fast drags.
+Line/bar charts: D3.js direct DOM manipulation.
+All chart animations: cubic-bezier(0.16, 1, 0.3, 1) easing.
+Fixed Y-axis ranges on charts are INTENTIONAL — they prevent rescaling during drag, which preserves visual stability and gives stronger comparative feedback. Do not "fix" this.
 
-## Data Layer
+3. Visual Design — Financial Times Warm Palette
 
-### Funds (V1 — 10 ETFs)
-VOO, BND, VXUS, SCHD, SCHF, SCHI, VTI, QQQ, BNDX, VBR
+Background: salmon/cream (#FFF1E5)
+Cards: white with warm borders
+Accent: crimson
+This is NOT a dark theme product. It is warm, editorial, approachable.
+Do not introduce cold grays, dark backgrounds, or generic dashboard aesthetics.
 
-### Data Requirements
-- 15 years of monthly data per fund
-- Store BOTH adjusted close (total return, dividends reinvested) AND regular close (price return only) — the dividend toggle needs both series
-- Bulk download via `yfinance` on initial setup
-- Monthly refresh script (cron job or manual) that appends the latest month's data for all 10 funds — this is ~10 API calls, essentially free
-- Serve to frontend as JSON via FastAPI endpoint
+4. Tailwind Config Changes Require Dev Server Restart
 
-### Storage Schema (SQLite)
-- Table: `prices`
-- Columns: `ticker`, `date`, `adjusted_close`, `close`
-- ~1,800 rows total (10 funds × 180 months) — trivially small
+Hot reload does NOT pick up changes to tailwind.config.js
+After any Tailwind config change, restart the dev server
+This has caused multiple debugging sessions — do not skip this step
 
-## V1 Features
+5. Vite Environment Variables
 
-### Fund Selection
-- All 10 funds displayed in a tray/sidebar
-- **Drag and drop** a fund from the tray into the portfolio area (max 4 active funds)
-- Each active fund shows: a slider, a precision input box, and a remove button
-- When a fund is **removed**, its allocation is distributed **evenly** across remaining funds
-- When a fund is **added**, it starts at 0% (user adjusts from there)
+VITE_ prefixed env vars are baked in at BUILD time, not runtime
+Changing them on Vercel requires a fresh build (not just redeploy)
+Clear cache if values seem stale after a new build
 
-### Allocation Controls
-- **Slider** per fund: dragging adjusts that fund's weight
-- **Input box** per fund: type a precise percentage; slider thumb moves to match
-- **Auto-rebalance on adjust**: when one fund's weight changes (via slider or input), the other active funds adjust **proportionally to their current weights** to keep total at exactly 100%
-- Pie chart animates **continuously during drag**, not on release
+6. Build Script
 
-### Visualizations (all animate live during slider drag)
-1. **Pie chart** — shows current allocation; wedges morph smoothly as sliders move
-2. **Cumulative returns line graph** (D3) — "Growth of $10,000" over the full 15-year period; line smoothly interpolates between states on each slider change
-3. **Annualized returns bar chart** (D3) — bar heights animate on allocation change
+frontend/package.json "build" script should be just "vite build"
+Do NOT add "tsc -b" to the build script — it causes permission errors on Vercel's Linux build server due to Windows-generated package-lock.json
 
-### Stats Panel
-- **CAGR** (Compound Annual Growth Rate)
-- **Annualized Volatility** (standard deviation of monthly returns × √12)
-- **Max Drawdown** (largest peak-to-trough decline)
-- **Sharpe Ratio** (assume risk-free rate of current 3-month T-bill, or a sensible default like 2%)
+Data Layer
+Available Funds
 
-All stats update live during slider interaction.
+12 ETFs: VOO, BND, VXUS, SCHD, SCHF, SCHI, VTI, QQQ, BNDX, VBR, GLD, DBC
+5 Fidelity mutual funds: FXAIX, FSKAX, FTIHX, FXNAX, FBGRX
+~500 S&P 500 stocks (via backend, for custom index builder)
+McMerica 25 constituent stocks (25 individual stocks, some outside S&P 500)
 
-### Dividend Toggle
-- Toggle switch: **Total Return** (dividends reinvested) vs **Price Return** (price only)
-- Switching recalculates everything using the appropriate data series (adjusted_close vs close)
-- This is especially meaningful for dividend-heavy funds like SCHD
+Data Serving
 
-### Rebalancing Toggle
-- Toggle switch: **Annual Rebalance** on/off
-- When on, portfolio is rebalanced to target allocation at the start of each calendar year
-- When off, portfolio drifts with market performance (buy-and-hold)
+ETFs and mutual funds: static JSON shipped with frontend (frontend/public/data/prices.json)
+Individual stocks: fetched from backend API (FastAPI reading from SQLite)
+Monthly granularity, both adjusted close and regular close stored
+15 years of history for ETFs, variable depth for individual stocks
 
-### Time Period
-- V1: Fixed at full 15-year history. No custom date range selector yet.
+Custom Index Builder
 
-## V1 Explicitly NOT Included (V2+)
-- Comparison mode (Portfolio A vs Portfolio B side by side)
-- Fund locking (prevent a fund from auto-adjusting when others change)
-- Custom time range selection / period presets
-- More than 4 active funds
-- More than 10 available funds
-- Rebalancing frequencies other than annual
-- User accounts, saving portfolios, sharing links
-- Deployment infrastructure (start local)
+Users select individual stocks, assign weightings (manual or equal-weight)
+Two-layer calculation: compute custom fund return series from constituent stocks, then feed into portfolio engine as a single fund
+McMerica 25 is a pre-built custom fund available in the fund tray
+Cap-weighted indices are deferred (no historical market cap data yet)
 
-## Project Structure
+Calculation Engine (calculations.ts)
+Pure functions that accept allocations, price data, and configuration flags. Returns cumulative values, annual returns, and key stats.
+Stats Computed
 
-```
-portfolio-backtester/
-├── CLAUDE.md
-├── frontend/
-│   ├── package.json
-│   ├── tsconfig.json
-│   ├── tailwind.config.js
-│   ├── public/
-│   └── src/
-│       ├── App.tsx
-│       ├── components/
-│       │   ├── FundTray.tsx          # Available funds, drag source
-│       │   ├── PortfolioSlot.tsx     # Single fund: slider + input + remove
-│       │   ├── AllocationPanel.tsx   # Portfolio area: drop target, up to 4 slots
-│       │   ├── PieChart.tsx          # Animated pie chart (Framer Motion)
-│       │   ├── CumulativeChart.tsx   # D3 line chart
-│       │   ├── AnnualReturnsChart.tsx# D3 bar chart
-│       │   ├── StatsPanel.tsx        # CAGR, vol, drawdown, Sharpe
-│       │   └── ToggleSwitch.tsx      # Reusable toggle for rebalance + dividends
-│       ├── hooks/
-│       │   ├── usePortfolio.ts       # Allocation state, auto-rebalance logic
-│       │   └── usePriceData.ts       # Fetch + cache price data from API
-│       ├── utils/
-│       │   ├── calculations.ts       # Portfolio return math, stats, drawdown
-│       │   └── animations.ts         # Shared easing curves, transition configs
-│       └── types/
-│           └── index.ts              # Fund, Allocation, PriceData types
-├── backend/
-│   ├── requirements.txt              # fastapi, uvicorn, yfinance, sqlite3
-│   ├── main.py                       # FastAPI app, serves price data
-│   ├── db.py                         # SQLite connection + queries
-│   ├── download.py                   # Initial bulk download script
-│   └── refresh.py                    # Monthly refresh script
-└── data/
-    └── prices.db                     # SQLite database file
-```
+CAGR (Compound Annual Growth Rate)
+Annualized Volatility (std dev of monthly returns × √12)
+Max Drawdown (largest peak-to-trough decline)
+Sharpe Ratio
 
-## Critical Implementation Notes
+Key Behaviors
 
-### Performance
-- The portfolio calculation engine (in `calculations.ts`) MUST run in <16ms for 4 funds × 180 months. This is easily achievable but must not regress — no unnecessary allocations or re-renders during drag.
-- Slider `onChange` fires on every frame during drag. Debouncing is NOT acceptable — the whole point is real-time feedback. Instead, keep the math fast.
-- Use `useMemo` and `useCallback` strategically. Memoize price data; recalculate returns only when allocations or toggles change.
+Auto-rebalance: adjusting one fund proportionally adjusts others to keep total at 100%
+Rebalancing frequencies: monthly, quarterly, semi-annual, annual
+Fund locking: locked funds are excluded from auto-rebalance redistribution
+Contributions: monthly additions with capital-invested baseline
+Benchmark: 100% VOO overlay, adjusts for contributions and dividend toggle for apples-to-apples comparison
+Dividend toggle: switches between adjusted close (total return) and regular close (price only)
 
-### Auto-Rebalance Logic (Proportional)
-When fund X's weight changes by delta:
-1. Calculate the total weight of all OTHER active funds
-2. Each other fund absorbs a share of -delta proportional to its current weight relative to that total
-3. Clamp all weights to [0, 100], ensure sum is exactly 100
-4. Edge case: if all other funds are at 0%, distribute evenly instead
+Features Currently Live
 
-### Animation
-- Pie chart: animate arc angles via Framer Motion's `animate` prop. Do NOT unmount/remount slices.
-- Line chart: D3 path interpolation between old and new data points. Use `d3.interpolatePath` or manual point interpolation.
-- Bar chart: animate bar heights via D3 transitions or Framer Motion.
-- All transitions: `cubic-bezier(0.16, 1, 0.3, 1)` default easing, ~200ms duration for slider-driven updates.
+Drag-and-drop fund selection (max 4 active funds)
+Real-time sliders with continuous update
+Pie/donut chart with toggle (Framer Motion)
+Cumulative returns line chart (D3) — "Growth of $X"
+Annual returns bar chart (D3)
+Rolling returns chart (1yr, 3yr, 5yr toggle)
+Stats panel (CAGR, volatility, max drawdown, Sharpe)
+5 preset portfolios (60/40 Classic, Boglehead 3-Fund, Growth Tilt, Dividend Focus, All Weather)
+Fund locking (lock icon per fund)
+Starting principal input + periodic monthly contributions
+Shareable links (portfolio state encoded in URL query params)
+Resizable chart containers (drag handle, persists to localStorage)
+Interactive tooltips on line charts (crosshair, date, value, return %)
+Ticker banner at top (McMerica 25, S&P 500, Dow Jones)
+Custom index builder (search stocks, add, name fund, set weights)
+McMerica 25 as pre-built fund in tray
+Mobile responsiveness (vertical stacking, collapsible sidebar)
+Tier system scaffolded (returns premium for all users currently)
+
+Prompting Guidelines
+When making changes to this codebase:
+
+Diagnose before prescribing — grep/search for the relevant code before making changes. Understand what exists before modifying it.
+Name the technology layer — be specific about whether a change targets Tailwind config, inline styles, CSS variables, React component logic, or D3 rendering code.
+Restart dev server after Tailwind config changes — this is not optional.
+Preserve the slider interaction loop — any change that adds latency between slider input and visual output must be flagged and justified.
+Preserve the warm palette — #FFF1E5 background, white cards, crimson accents. No dark themes, no cold grays.
+Test on mobile — the product must work well on phone screens. Sliders need adequate touch targets.
+Do not introduce debouncing on slider onChange unless explicitly asked and the performance justification is documented.
