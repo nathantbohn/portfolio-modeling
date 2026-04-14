@@ -65,11 +65,6 @@ export default function PresetPortfolios({ onSelect }: PresetPortfoliosProps) {
 
   return (
     <div>
-      <div className="px-3.5 py-2 border-b border-border">
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-warm-200">
-          Presets
-        </p>
-      </div>
       <div className="p-1.5 flex flex-wrap gap-1">
         {PRESETS.map((preset, i) => (
           <button

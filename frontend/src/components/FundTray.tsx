@@ -101,15 +101,6 @@ function DraggableFund({
 export default function FundTray({ activeTickers, isFull, customFunds, onOpenBuilder }: FundTrayProps) {
   return (
     <div>
-      <div className="px-3.5 py-2 border-b border-border flex items-center justify-between">
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-warm-200">
-          Funds
-        </p>
-        {isFull && (
-          <p className="text-[10px] text-warm-300">Full</p>
-        )}
-      </div>
-
       <div className="p-1.5 space-y-px max-h-[40vh] sm:max-h-none overflow-y-auto">
         {ALL_TICKERS.map((ticker) => {
           const isActive = activeTickers.has(ticker)

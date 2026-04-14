@@ -102,6 +102,8 @@ export default function App() {
       return window.innerWidth < 768
     } catch { return false }
   })
+  const [presetsOpen, setPresetsOpen] = useState(false)
+  const [fundsOpen, setFundsOpen] = useState(false)
 
   const handleShare = useCallback(() => {
     const url = buildShareUrl({
@@ -201,7 +203,7 @@ export default function App() {
               isMobile ? 'border-b w-full' : 'border-r',
             ].join(' ')}
             style={isMobile
-              ? { maxHeight: sidebarCollapsed ? 32 : '50vh' }
+              ? { maxHeight: sidebarCollapsed ? 32 : '40vh' }
               : { width: sidebarCollapsed ? 32 : 320 }
             }
           >
@@ -213,7 +215,9 @@ export default function App() {
                 try { localStorage.setItem('sidebar-collapsed', String(next)) } catch { /* */ }
               }}
               className={[
-                'absolute z-10 w-5 h-5 rounded-full bg-surface-1 border border-border flex items-center justify-center text-warm-300 hover:text-warm-50 hover:bg-surface-2 transition-colors',
+                'absolute z-10 flex items-center justify-center transition-colors',
+                'w-6 h-6 rounded-full bg-surface-1 border border-border text-warm-300 hover:text-warm-50 hover:bg-surface-2 hover:border-warm-300',
+                'before:absolute before:inset-[-9px] before:content-[""]',
                 isMobile ? 'bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2' : 'top-2 right-0 translate-x-1/2',
               ].join(' ')}
               aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
@@ -312,13 +316,62 @@ export default function App() {
 
             {/* Scrollable controls area */}
             <div className="flex-1 min-h-0 overflow-y-auto">
-              <PresetPortfolios onSelect={setFunds} />
-              <FundTray
-                activeTickers={activeTickers}
-                isFull={isFull}
-                customFunds={customFunds}
-                onOpenBuilder={() => setShowBuilder(true)}
-              />
+              {/* Collapsible: Presets */}
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setPresetsOpen((v) => !v)}
+                  className="w-full px-3.5 py-2 border-b border-border flex items-center justify-between hover:bg-surface-0/50 transition-colors"
+                >
+                  <span className="text-[10px] font-semibold uppercase tracking-widest text-warm-200">Presets</span>
+                  <svg
+                    width="10" height="10" viewBox="0 0 10 10" fill="none"
+                    className="text-warm-300 transition-transform duration-200"
+                    style={{ transform: presetsOpen ? 'rotate(180deg)' : '' }}
+                  >
+                    <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+                {presetsOpen && <PresetPortfolios onSelect={setFunds} />}
+              </div>
+
+              {/* Collapsible: Funds */}
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setFundsOpen((v) => !v)}
+                  className="w-full px-3.5 py-2 border-b border-border flex items-center justify-between hover:bg-surface-0/50 transition-colors"
+                >
+                  <span className="text-[10px] font-semibold uppercase tracking-widest text-warm-200">Funds</span>
+                  <span className="flex items-center gap-2">
+                    {isFull && <span className="text-[10px] text-warm-300">Full</span>}
+                    <svg
+                      width="10" height="10" viewBox="0 0 10 10" fill="none"
+                      className="text-warm-300 transition-transform duration-200"
+                      style={{ transform: fundsOpen ? 'rotate(180deg)' : '' }}
+                    >
+                      <path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </span>
+                </button>
+                {fundsOpen && (
+                  <FundTray
+                    activeTickers={activeTickers}
+                    isFull={isFull}
+                    customFunds={customFunds}
+                    onOpenBuilder={() => setShowBuilder(true)}
+                  />
+                )}
+              </div>
+            </div>
+            </div>
+          </aside>
+
+          {/* ── Visualization Area ──────────────────────────────────── */}
+          <main className="flex-1 min-w-0 overflow-y-auto p-3 sm:p-4 space-y-0">
+
+            {/* Allocation sliders */}
+            <div className="mb-3">
               <AllocationPanel
                 activeFunds={activeFunds}
                 onSetWeight={setWeight}
@@ -327,11 +380,6 @@ export default function App() {
                 customFundMeta={customFundMeta}
               />
             </div>
-            </div>
-          </aside>
-
-          {/* ── Visualization Area ──────────────────────────────────── */}
-          <main className="flex-1 min-w-0 overflow-y-auto p-3 sm:p-4 space-y-0">
 
             {/* Top row: pie chart + stats */}
             <div className="flex flex-col sm:flex-row gap-3 flex-shrink-0 mb-3 sm:h-[240px]">
