@@ -87,6 +87,16 @@ def main() -> None:
         result["MCMERICA-25"] = mcmerica
         print(f"McMerica 25: {len(mcmerica)} data points from {len([t for t in MCMERICA_25 if t in result])} constituents")
 
+        # Write MCMERICA-25 to SQLite so the backend API also serves it
+        conn2 = sqlite3.connect(DB_PATH)
+        conn2.executemany(
+            "INSERT OR REPLACE INTO prices (ticker, date, adjusted_close, close) VALUES (?, ?, ?, ?)",
+            [("MCMERICA-25", r["date"], r["adjusted_close"], r["close"]) for r in mcmerica],
+        )
+        conn2.commit()
+        conn2.close()
+        print(f"McMerica 25: wrote {len(mcmerica)} rows to prices.db")
+
     os.makedirs(os.path.dirname(OUT_PATH), exist_ok=True)
     with open(OUT_PATH, "w") as f:
         json.dump(result, f, separators=(",", ":"))

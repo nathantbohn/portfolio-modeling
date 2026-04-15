@@ -16,7 +16,7 @@ import yfinance as yf
 
 sys.path.insert(0, __file__.rsplit("/", 1)[0] if "/" in __file__ else ".")
 
-from db import init_db, upsert_prices, get_all_tickers
+from db import init_db, upsert_prices, get_all_tickers, get_prices_by_ticker
 
 
 def refresh_ticker(ticker: str, start: str, end: str) -> list[dict]:
@@ -49,6 +49,54 @@ def refresh_ticker(ticker: str, start: str, end: str) -> list[dict]:
     return rows
 
 
+MCMERICA_25 = [
+    "CVX", "MCD", "PEP", "COST", "BRK-B", "PM", "WDC", "DD", "JNJ", "F",
+    "COP", "WMT", "TAP", "FCX", "HD", "HOG", "AAL", "MAR", "AXP", "JPM",
+    "CAT", "GD", "T", "DIS", "DE",
+]
+
+
+def recompute_mcmerica() -> None:
+    """Recompute MCMERICA-25 composite from constituent stock data in the DB."""
+    all_data: dict[str, list[dict]] = {}
+    for t in MCMERICA_25:
+        rows = get_prices_by_ticker(t)
+        if rows:
+            all_data[t] = [{"date": r["date"], "adjusted_close": r["adjusted_close"], "close": r["close"]} for r in rows]
+
+    available = [t for t in MCMERICA_25 if t in all_data and len(all_data[t]) > 0]
+    if not available:
+        print("McMerica 25: no constituent data found, skipping")
+        return
+
+    n = len(available)
+    weight = 1.0 / n
+
+    maps_adj = [{r["date"]: r["adjusted_close"] for r in all_data[t]} for t in available]
+    maps_close = [{r["date"]: r["close"] for r in all_data[t]} for t in available]
+
+    common = sorted(set.intersection(*(set(m.keys()) for m in maps_adj)))
+    if len(common) < 2:
+        print("McMerica 25: insufficient common dates, skipping")
+        return
+
+    base = 100.0
+    adj_val = base
+    close_val = base
+    mc_rows = [{"ticker": "MCMERICA-25", "date": common[0], "adjusted_close": base, "close": base}]
+
+    for i in range(1, len(common)):
+        d, pd_ = common[i], common[i - 1]
+        adj_ret = sum(weight * (maps_adj[j][d] / maps_adj[j][pd_]) for j in range(n))
+        close_ret = sum(weight * (maps_close[j][d] / maps_close[j][pd_]) for j in range(n))
+        adj_val *= adj_ret
+        close_val *= close_ret
+        mc_rows.append({"ticker": "MCMERICA-25", "date": d, "adjusted_close": adj_val, "close": close_val})
+
+    upsert_prices(mc_rows)
+    print(f"McMerica 25: recomputed {len(mc_rows)} rows from {n} constituents")
+
+
 def refresh() -> None:
     init_db()
 
@@ -79,6 +127,9 @@ def refresh() -> None:
         print(f"\nUpserted {len(total_rows)} rows into prices.db ({errors} errors)")
     else:
         print("No rows fetched — check errors above.")
+
+    # Recompute McMerica 25 composite from updated constituent data
+    recompute_mcmerica()
 
 
 if __name__ == "__main__":
