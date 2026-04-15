@@ -449,6 +449,20 @@ export default function App() {
               </div>
             </div>
 
+            {/* Survivorship bias disclaimer */}
+            {activeFunds.some(f => f.ticker.startsWith('CUSTOM-') || f.ticker === 'MCMERICA-25') && (
+              <div className="flex items-start gap-2 px-3 py-2 mb-3 rounded-md bg-surface-1 border border-border">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="flex-shrink-0 mt-px text-warm-300">
+                  <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.2" />
+                  <path d="M8 7v4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                  <circle cx="8" cy="5" r="0.8" fill="currentColor" />
+                </svg>
+                <p className="text-[11px] text-warm-300 leading-relaxed">
+                  Backtests of custom funds only include stocks currently trading. Historical results may overstate performance due to survivorship bias.
+                </p>
+              </div>
+            )}
+
             {/* Cumulative returns */}
             <ResizablePanel id="cumulative" defaultHeight={320}>
               <CumulativeChart
