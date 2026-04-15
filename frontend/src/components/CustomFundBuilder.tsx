@@ -26,6 +26,8 @@ export default function CustomFundBuilder({ onClose, onCreate }: CustomFundBuild
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
   const [showResults, setShowResults] = useState(false)
+  const [searchLoading, setSearchLoading] = useState(false)
+  const [searchError, setSearchError] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const searchRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -34,12 +36,22 @@ export default function CustomFundBuilder({ onClose, onCreate }: CustomFundBuild
   const doSearch = useCallback((q: string) => {
     if (!API_URL || q.length < 1) {
       setResults([])
+      setSearchLoading(false)
+      setSearchError(false)
       return
     }
-    fetch(`${API_URL}/search?q=${encodeURIComponent(q)}`)
-      .then((res) => res.ok ? res.json() as Promise<SearchResult[]> : [])
-      .then(setResults)
-      .catch(() => setResults([]))
+    setSearchLoading(true)
+    setSearchError(false)
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 45_000)
+    fetch(`${API_URL}/search?q=${encodeURIComponent(q)}`, { signal: controller.signal })
+      .then((res) => {
+        if (!res.ok) throw new Error('not ok')
+        return res.json() as Promise<SearchResult[]>
+      })
+      .then((data) => { setResults(data); setSearchError(false) })
+      .catch(() => { setResults([]); setSearchError(true) })
+      .finally(() => { setSearchLoading(false); clearTimeout(timer) })
   }, [])
 
   useEffect(() => {
@@ -145,16 +157,28 @@ export default function CustomFundBuilder({ onClose, onCreate }: CustomFundBuild
                   disabled={stocks.length >= MAX_STOCKS}
                   className="w-full bg-surface-0 border border-border rounded-md px-2.5 py-1.5 text-xs text-warm-50 placeholder:text-warm-400 focus:outline-none focus:border-warm-300 transition-colors disabled:opacity-40"
                 />
-                {showResults && results.length > 0 && inputRef.current && (() => {
+                {showResults && query.length >= 1 && inputRef.current && (() => {
                   const rect = inputRef.current!.getBoundingClientRect()
+                  const filtered = results.filter((r) => !stocks.some((s) => s.ticker === r.ticker))
+                  const showDropdown = searchLoading || searchError || filtered.length > 0
+                  if (!showDropdown) return null
                   return (
                     <div
                       className="fixed z-[60] bg-surface-1 border border-border rounded-md shadow-lg max-h-56 overflow-y-auto"
                       style={{ top: rect.bottom + 4, left: rect.left, width: rect.width }}
                     >
-                      {results
-                        .filter((r) => !stocks.some((s) => s.ticker === r.ticker))
-                        .map((r) => (
+                      {searchLoading ? (
+                        <div className="px-2.5 py-3 flex items-center justify-center gap-2">
+                          <div className="w-3 h-3 rounded-full border-2 border-warm-300 border-t-transparent animate-spin" />
+                          <span className="text-[11px] text-warm-300">Searching...</span>
+                        </div>
+                      ) : searchError ? (
+                        <div className="px-2.5 py-3 text-center">
+                          <p className="text-[11px] text-accent">Server unavailable</p>
+                          <p className="text-[10px] text-warm-300 mt-0.5">Try again in a moment</p>
+                        </div>
+                      ) : (
+                        filtered.map((r) => (
                           <button
                             key={r.ticker}
                             onClick={() => addStock(r)}
@@ -165,7 +189,8 @@ export default function CustomFundBuilder({ onClose, onCreate }: CustomFundBuild
                             <span className="text-[11px] text-warm-200 truncate flex-1">{r.name}</span>
                             <span className="text-[10px] text-warm-400 flex-shrink-0">{r.sector}</span>
                           </button>
-                        ))}
+                        ))
+                      )}
                     </div>
                   )
                 })()}

@@ -67,7 +67,7 @@ export default function App() {
     return [...tickers]
   }, [activeFunds, customFunds])
 
-  const { data: stockPrices } = useStockPrices(stockTickersToFetch)
+  const { data: stockPrices, loading: stockLoading, errors: stockErrors, retry: retryStockFetch } = useStockPrices(stockTickersToFetch)
 
   // Merge synthesized custom fund price data with base price data
   // (McMerica 25 is pre-computed in prices.json as ticker "MCMERICA-25")
@@ -94,6 +94,23 @@ export default function App() {
     for (const f of customFunds) map[f.id] = { name: f.name, color: f.color }
     return map
   }, [customFunds])
+
+  // Determine loading/error state per custom fund
+  const customFundStatus = useMemo(() => {
+    const status: Record<string, 'loading' | 'error' | 'ready'> = {}
+    for (const fund of customFunds) {
+      const isActive = activeFunds.some((f) => f.ticker === fund.id)
+      if (!isActive) continue
+      const tickers = fund.stocks.map((s) => s.ticker)
+      const hasError = tickers.some((t) => stockErrors[t])
+      const allFetched = tickers.every((t) => stockPrices[t]?.length > 0)
+      if (hasError) status[fund.id] = 'error'
+      else if (!allFetched && stockLoading) status[fund.id] = 'loading'
+      else if (!allFetched) status[fund.id] = 'loading' // waiting for first fetch
+      else status[fund.id] = 'ready'
+    }
+    return status
+  }, [customFunds, activeFunds, stockPrices, stockErrors, stockLoading])
 
   const [urlInit] = useState(() => parseUrlState())
   const [showBenchmark, setShowBenchmark] = useState(urlInit.benchmark ?? false)
@@ -391,6 +408,35 @@ export default function App() {
                 onToggleLock={toggleLock}
                 customFundMeta={customFundMeta}
               />
+              {/* Loading / error states for custom funds needing backend data */}
+              {Object.entries(customFundStatus).map(([fundId, status]) => {
+                if (status === 'ready') return null
+                const name = customFundMeta[fundId]?.name ?? fundId
+                return (
+                  <div key={fundId} className="mt-1.5 rounded-md border border-border bg-surface-1 px-3 py-2.5">
+                    {status === 'loading' ? (
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full border-2 border-warm-300 border-t-transparent animate-spin flex-shrink-0" />
+                        <span className="text-xs text-warm-200 animate-pulse">Loading {name}...</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="text-xs text-accent">Couldn't load {name}</p>
+                          <p className="text-[10px] text-warm-300 mt-0.5">Server may be starting up — try again in a moment</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={retryStockFetch}
+                          className="flex-shrink-0 text-[11px] text-warm-200 hover:text-warm-50 border border-border rounded px-2 py-1 hover:bg-surface-2 transition-colors"
+                        >
+                          Retry
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
 
             {/* Top row: pie chart + stats */}
