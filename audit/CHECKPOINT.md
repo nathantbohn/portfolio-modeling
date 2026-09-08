@@ -47,3 +47,11 @@
 - Timestamp: 2026-09-08 00:15 local
 - Notes: ~28% duplication across 3 D3 charts (shared-module proposal). App.tsx/CumulativeChart/CustomFundBuilder decomposition proposals. warm-300/400 text fails WCAG AA. Click-to-add not keyboard operable (no KeyboardSensor). PieChart drops custom fund colors. 4-vs-5 fund limit inconsistency.
 - Files written: audit/07_frontend_quality.md
+
+## Phase 8 — Report
+- Status: COMPLETE
+- Timestamp: 2026-09-08 00:30 local
+- Notes: Final verification — build PASS (2.76s), tsc 0 errors, tests 74/77 pass (3 intentional P0/P1 finding failures: vol-with-contributions, maxDD-with-contributions, IRR timing). REPORT.md tiers 2 P0, 2 P1, 14 P2, 11 P3 findings. PROPOSED_FIXES.md has ready-to-run prompts PF-1..PF-3.
+- Files written: audit/REPORT.md, audit/PROPOSED_FIXES.md
+
+# AUDIT COMPLETE — all 9 phases done.
