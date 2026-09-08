@@ -41,3 +41,9 @@
 - Timestamp: 2026-09-08 00:05 local
 - Notes: All 7 npm vulns are dev/build-time only (prod bundle clean). starlette advisories mostly unreachable (GET-only API). URL tampering: weight=Infinity NaN-cascade verified (S-1), principal=0 NaN CAGR, fund-count cap bypass. localStorage safe. Nothing upgraded.
 - Files written: audit/06_security_deps.md
+
+## Phase 7 — Frontend quality
+- Status: COMPLETE
+- Timestamp: 2026-09-08 00:15 local
+- Notes: ~28% duplication across 3 D3 charts (shared-module proposal). App.tsx/CumulativeChart/CustomFundBuilder decomposition proposals. warm-300/400 text fails WCAG AA. Click-to-add not keyboard operable (no KeyboardSensor). PieChart drops custom fund colors. 4-vs-5 fund limit inconsistency.
+- Files written: audit/07_frontend_quality.md
