@@ -14,8 +14,6 @@ export const MUTUAL_FUND_TICKERS = [
   'FXAIX', 'FSKAX', 'FTIHX', 'FXNAX', 'FBGRX',
 ] as const
 
-export type Ticker = typeof ALL_TICKERS[number]
-
 const MAX_FUNDS = 5
 
 const DEFAULT_FUNDS: Allocation[] = [
