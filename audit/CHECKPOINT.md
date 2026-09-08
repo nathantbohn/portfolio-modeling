@@ -23,3 +23,9 @@
 - Timestamp: 2026-09-07 23:35 local
 - Notes: 32 new tests added across 3 files; 3 intentionally-failing finding tests (vol-with-contributions, maxDD-with-contributions, IRR timing). 74/77 pass; the 3 failures are the findings. Build + tsc still clean.
 - Files written: audit/03_calc_correctness.md, frontend/src/utils/calculations.audit.test.ts, frontend/src/utils/synthesize.test.ts, frontend/src/hooks/usePortfolio.locking.test.ts
+
+## Phase 4 — Performance
+- Status: COMPLETE
+- Timestamp: 2026-09-07 23:45 local
+- Notes: Budget holds with ~13x headroom (worst case p95 1.2ms vs 16ms). Biggest avoidable cost: synthesizePriceData re-runs per slider frame (App mergedPriceData memo dep on activeFunds). No fixes applied.
+- Files written: audit/04_performance.md, audit/bench.ts
