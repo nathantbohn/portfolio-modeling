@@ -29,3 +29,9 @@
 - Timestamp: 2026-09-07 23:45 local
 - Notes: Budget holds with ~13x headroom (worst case p95 1.2ms vs 16ms). Biggest avoidable cost: synthesizePriceData re-runs per slider frame (App mergedPriceData memo dep on activeFunds). No fixes applied.
 - Files written: audit/04_performance.md, audit/bench.ts
+
+## Phase 5 — Backend
+- Status: COMPLETE
+- Timestamp: 2026-09-07 23:55 local
+- Notes: /prices = 7.45MB uncompressed, N+1 (526 queries), no gzip/cache — P1. No SQL injection (parameterized, verified live). Connections never closed (P2). Data stale since Apr 2026.
+- Files written: audit/05_backend.md
