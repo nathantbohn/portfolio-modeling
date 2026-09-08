@@ -17,3 +17,9 @@
 - Timestamp: 2026-09-07 23:22 local
 - Notes: 2 code commits made (02dbc91 type-safety, 260c287 dead-code). tsc/build/tests verified after each. Backend mypy clean; ruff only cosmetic/ETL findings. eslint not actually installed/configured despite lint script — reported.
 - Files written: audit/02_static.md
+
+## Phase 3 — Calculation engine correctness
+- Status: COMPLETE
+- Timestamp: 2026-09-07 23:35 local
+- Notes: 32 new tests added across 3 files; 3 intentionally-failing finding tests (vol-with-contributions, maxDD-with-contributions, IRR timing). 74/77 pass; the 3 failures are the findings. Build + tsc still clean.
+- Files written: audit/03_calc_correctness.md, frontend/src/utils/calculations.audit.test.ts, frontend/src/utils/synthesize.test.ts, frontend/src/hooks/usePortfolio.locking.test.ts
