@@ -35,3 +35,9 @@
 - Timestamp: 2026-09-07 23:55 local
 - Notes: /prices = 7.45MB uncompressed, N+1 (526 queries), no gzip/cache — P1. No SQL injection (parameterized, verified live). Connections never closed (P2). Data stale since Apr 2026.
 - Files written: audit/05_backend.md
+
+## Phase 6 — Security & dependencies
+- Status: COMPLETE
+- Timestamp: 2026-09-08 00:05 local
+- Notes: All 7 npm vulns are dev/build-time only (prod bundle clean). starlette advisories mostly unreachable (GET-only API). URL tampering: weight=Infinity NaN-cascade verified (S-1), principal=0 NaN CAGR, fund-count cap bypass. localStorage safe. Nothing upgraded.
+- Files written: audit/06_security_deps.md
