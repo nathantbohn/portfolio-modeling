@@ -11,3 +11,9 @@
 - Timestamp: 2026-09-07 23:15 local
 - Notes: 3 zero-importer frontend files found (animations.ts, config/tiers.ts, config/mcmerica25.ts). Data-flow discrepancy vs CLAUDE.md: VITE_API_URL switches ENTIRE base load to backend /prices (525 tickers).
 - Files written: audit/01_inventory.md
+
+## Phase 2 — Static analysis
+- Status: COMPLETE
+- Timestamp: 2026-09-07 23:22 local
+- Notes: 2 code commits made (02dbc91 type-safety, 260c287 dead-code). tsc/build/tests verified after each. Backend mypy clean; ruff only cosmetic/ETL findings. eslint not actually installed/configured despite lint script — reported.
+- Files written: audit/02_static.md
