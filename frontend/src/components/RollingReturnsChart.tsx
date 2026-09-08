@@ -100,9 +100,9 @@ export default function RollingReturnsChart({ data, window: activeWindow, onWind
 
     const g = sel.select<SVGGElement>('.chart-g')
 
-    const xAxis = d3.axisBottom(x)
+    const xAxis = d3.axisBottom<Date>(x)
       .ticks(Math.min(parsed.length, 8))
-      .tickFormat(d3.timeFormat('%Y') as any)
+      .tickFormat(d3.timeFormat('%Y'))
       .tickSize(0)
       .tickPadding(8)
 
