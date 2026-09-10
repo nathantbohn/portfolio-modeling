@@ -115,4 +115,12 @@ Custom-25 + 3 ETFs, monthly rebal + contributions (worst case) + benchmark
 computePortfolio only (pre-merged data): p50 0.152 ms   p95 0.196 ms
 ```
 
-Fix #1 adds one extra pass over ≤ 4 holdings per month and one `CumulativePoint[]` of length n. Expected cost well under 0.05 ms; re-measured after the change (see the Resolution note in `03_calc_correctness.md`).
+After (same machine, same run length):
+
+```
+Custom-25 + 3 ETFs, monthly rebal + contributions (worst case) + benchmark
+  p50 0.802 ms   p95 1.102 ms   max 2.771 ms
+computePortfolio only (pre-merged data): p50 0.173 ms   p95 0.222 ms
+```
+
+Delta at the worst case: +0.06 ms p50, +0.06 ms p95 — one extra accumulation per holding per month plus one `CumulativePoint[]` of length n. Within the 2 ms threshold.

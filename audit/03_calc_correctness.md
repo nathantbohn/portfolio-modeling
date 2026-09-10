@@ -45,3 +45,31 @@ Suite after Phase 3: **77 tests, 74 pass, 3 intentional failures** (the findings
 - `computePortfolio` with `initialValue = 0` (URL `?principal=0` is accepted by `parseUrlState`): values all 0, CAGR = `Math.pow(0/0, …)` → NaN propagated to stats. UI displays "NaN%". Minor edge (P2), listed in report.
 - `calcAnnualizedIRR` is plain Newton from a fixed 0.5%/month guess, no bracketing/fallback; pathological series (huge losses) could diverge. Not reproduced; recorded as uncertainty.
 - CAGR uses actual date span at 365.25 days/year — fine.
+
+---
+
+## Resolution (branch `fix/p0-calc-stats`, 2026-09-10)
+
+F3-1, F3-2 and F3-3 are fixed; all 79 tests pass (77 original + 2 new), `tsc --noEmit` 0 errors, `npm run build` green. Plan and worked examples: `audit/P0_FIX_PLAN.md`.
+
+**What changed**
+
+- `computePortfolio` now records each month's time-weighted return from the simulated holdings: `twr_i = (total after price move) / (total after rebalance + start-of-month deposit) − 1`, chained into a new `PortfolioResult.timeWeightedValues` series (starts at the principal; identical to `cumulativeValues` when contributions are 0). New `timeWeightedCagr` field.
+- Annualized volatility, max drawdown, annual returns, Sharpe (numerator = `timeWeightedCagr`) and rolling returns (`App.tsx`) are computed on the time-weighted series. Cumulative chart line, capital-invested baseline, ending balance, benchmark overlay and IRR remain money-weighted.
+- IRR cash-flow vector dates each deposit at the period the sim invests it: `cashflows[0] = −P − C`, `cashflows[1..n−2] = −C`, `cashflows[n−1] = +finalValue`.
+- StatsPanel label: "IRR (money-weighted)" when contributions are active. No other UI change.
+- The three finding tests keep their original expected values and now live under `describe('regression: contribution-mode statistics …')`.
+
+**Effect on real data** ($10k principal, $500/mo, annual rebalance, total return):
+
+| portfolio | vol before → after | max DD before → after | IRR before → after |
+|---|---|---|---|
+| 60/40 Classic | 10.13% → 9.49% | 17.58% → 20.24% | 9.49% → 9.42% |
+| Bond-heavy (BND 70 / BNDX 20 / VOO 10) | 6.19% → 4.97% | 9.27% → 15.57% | 3.28% → 3.25% |
+| Growth Tilt | 16.25% → 15.78% | 25.88% → 27.42% | 15.86% → 15.76% |
+
+With contributions off, every displayed value (CAGR, vol, max DD, Sharpe, final balance, all annual bars, all 36-month rolling points) across 5 portfolios × 4 rebalance cadences × 2 dividend modes (6,384 values) matches `main` exactly at displayed precision.
+
+**Performance** (`npx tsx audit/bench.ts`, node v24.14.0, worst case: Custom-25 + 3 ETFs, monthly rebalance + contributions + benchmark): p50 0.739 → 0.802 ms, p95 1.038 → 1.102 ms (+0.06 ms). `computePortfolio` alone: p95 0.196 → 0.222 ms. Well inside the 2 ms threshold; the added work is one extra accumulation per holding per month plus one `CumulativePoint[]` of length n.
+
+**Not changed (still open, P2)**: `calcAnnualizedIRR` remains un-bracketed Newton; `principal = 0` → NaN stats.
