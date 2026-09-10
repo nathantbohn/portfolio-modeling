@@ -22,17 +22,32 @@ export interface AnnualReturn {
   return: number // e.g. 0.12 = 12%
 }
 
+/**
+ * Two return series live side by side in a result:
+ *
+ * - MONEY-WEIGHTED (`cumulativeValues`): the actual dollar balance, deposits
+ *   included. Used for the "Growth of $X" chart line, the capital-invested
+ *   baseline, the ending balance and the IRR headline stat.
+ * - TIME-WEIGHTED (`timeWeightedValues`): the principal grown by the chain-linked
+ *   monthly returns of the simulated holdings, with contribution cash flows
+ *   excluded (GIPS convention). Used for volatility, max drawdown, annual and
+ *   rolling returns, Sharpe and the time-weighted CAGR.
+ *
+ * When `monthlyContribution` is 0 the two series are identical.
+ */
 export interface PortfolioResult {
-  cumulativeValues: CumulativePoint[]
+  cumulativeValues: CumulativePoint[] // money-weighted balance (includes contributions)
+  timeWeightedValues: CumulativePoint[] // principal × chained TWR (contributions excluded)
   capitalInvested: CumulativePoint[] // total capital deployed over time (principal + contributions)
   dividendValues: CumulativePoint[] // cumulative dividend income (only populated in price return mode)
-  annualReturns: AnnualReturn[]
+  annualReturns: AnnualReturn[] // calendar-year returns on the time-weighted series
   cagr: number // time-weighted CAGR when no contributions, money-weighted IRR when contributions active
+  timeWeightedCagr: number // always time-weighted; equals `cagr` when there are no contributions
   useIRR: boolean // true when CAGR is actually IRR (contributions > 0)
   totalContributed: number // principal + all contributions
-  annualizedVolatility: number
-  maxDrawdown: number
-  sharpeRatio: number
+  annualizedVolatility: number // on time-weighted monthly returns
+  maxDrawdown: number // on the time-weighted series
+  sharpeRatio: number // (timeWeightedCagr − risk-free) / annualizedVolatility
 }
 
 // ─── Main entry point ────────────────────────────────────────────────────────
@@ -92,10 +107,12 @@ export function computePortfolio(
   if (dates.length === 1) {
     return {
       cumulativeValues: [{ date: dates[0], value: initialValue }],
+      timeWeightedValues: [{ date: dates[0], value: initialValue }],
       capitalInvested: [{ date: dates[0], value: initialValue }],
       dividendValues: config.useTotalReturn ? [] : [{ date: dates[0], value: 0 }],
       annualReturns: [],
       cagr: 0,
+      timeWeightedCagr: 0,
       useIRR: false,
       totalContributed: initialValue,
       annualizedVolatility: 0,
@@ -117,6 +134,14 @@ export function computePortfolio(
 
   const cumulativeValues: CumulativePoint[] = new Array(n)
   cumulativeValues[0] = { date: dates[0], value: initialValue }
+
+  // Time-weighted series: principal grown by the holdings' chained monthly
+  // returns with contribution cash flows stripped out. Identical to
+  // cumulativeValues when there are no contributions.
+  const timeWeightedValues: CumulativePoint[] = new Array(n)
+  timeWeightedValues[0] = { date: dates[0], value: initialValue }
+  let twValue = initialValue
+  const monthlyReturns = new Float64Array(n - 1) // time-weighted monthly returns
 
   const capitalInvested: CumulativePoint[] = new Array(n)
   let totalInvested = initialValue
@@ -166,7 +191,11 @@ export function computePortfolio(
       totalInvested += contribution
     }
 
-    // Grow each holding by its fund's price ratio, accumulate portfolio total
+    // Grow each holding by its fund's price ratio, accumulate portfolio total.
+    // preGrowthValue is the invested balance the month's return acts on
+    // (after rebalance and after this month's deposit); the ratio of the two
+    // totals is the month's time-weighted return.
+    let preGrowthValue = 0
     let portfolioValue = 0
     for (const { ticker } of active) {
       const priceRatio = priceMap[ticker][date] / priceMap[ticker][prevDate]
@@ -177,11 +206,17 @@ export function computePortfolio(
         cumulativeDividend += holdings[ticker] * (adjRatio - priceRatio)
       }
 
+      preGrowthValue += holdings[ticker]
       holdings[ticker] *= priceRatio
       portfolioValue += holdings[ticker]
     }
 
+    const twr = portfolioValue / preGrowthValue - 1
+    monthlyReturns[i - 1] = twr
+    twValue *= 1 + twr
+
     cumulativeValues[i] = { date, value: portfolioValue }
+    timeWeightedValues[i] = { date, value: twValue }
     capitalInvested[i] = { date, value: totalInvested }
     if (trackDividends) {
       dividendValues[i] = { date, value: cumulativeDividend }
@@ -190,14 +225,17 @@ export function computePortfolio(
   }
 
   // ── Derived statistics ─────────────────────────────────────────────────────
-
-  // Monthly returns (n-1 values)
-  const monthlyReturns = new Float64Array(n - 1)
-  for (let i = 1; i < n; i++) {
-    monthlyReturns[i - 1] = cumulativeValues[i].value / cumulativeValues[i - 1].value - 1
-  }
+  // Risk and performance stats are time-weighted (contribution cash flows are
+  // not returns). Only the IRR headline is money-weighted.
 
   const finalValue = cumulativeValues[n - 1].value
+
+  // Time-weighted CAGR over the actual date span
+  const t0 = new Date(dates[0]).getTime()
+  const t1 = new Date(dates[n - 1]).getTime()
+  const years = (t1 - t0) / (365.25 * 24 * 60 * 60 * 1000)
+  const timeWeightedCagr = years > 0 ? Math.pow(twValue / initialValue, 1 / years) - 1 : 0
+
   const useIRR = hasContributions
   let cagr: number
 
@@ -209,21 +247,18 @@ export function computePortfolio(
     cashflows[n - 1] = -contribution + finalValue // last contribution + terminal value
     cagr = calcAnnualizedIRR(cashflows)
   } else {
-    // Time-weighted CAGR
-    const t0 = new Date(dates[0]).getTime()
-    const t1 = new Date(dates[n - 1]).getTime()
-    const years = (t1 - t0) / (365.25 * 24 * 60 * 60 * 1000)
-    cagr = years > 0 ? Math.pow(finalValue / initialValue, 1 / years) - 1 : 0
+    cagr = timeWeightedCagr
   }
 
   const annualizedVolatility = calcAnnualizedVol(monthlyReturns)
-  const maxDrawdown = calcMaxDrawdown(cumulativeValues)
-  const sharpeRatio = annualizedVolatility > 0 ? (cagr - RISK_FREE_RATE) / annualizedVolatility : 0
-  const annualReturns = calcAnnualReturns(cumulativeValues)
+  const maxDrawdown = calcMaxDrawdown(timeWeightedValues)
+  const sharpeRatio =
+    annualizedVolatility > 0 ? (timeWeightedCagr - RISK_FREE_RATE) / annualizedVolatility : 0
+  const annualReturns = calcAnnualReturns(timeWeightedValues)
 
   return {
-    cumulativeValues, capitalInvested, dividendValues, annualReturns,
-    cagr, useIRR, totalContributed: totalInvested,
+    cumulativeValues, timeWeightedValues, capitalInvested, dividendValues, annualReturns,
+    cagr, timeWeightedCagr, useIRR, totalContributed: totalInvested,
     annualizedVolatility, maxDrawdown, sharpeRatio,
   }
 }
@@ -420,10 +455,12 @@ function calcAnnualizedIRR(cashflows: Float64Array, maxIter = 50, tol = 1e-8): n
 function emptyResult(): PortfolioResult {
   return {
     cumulativeValues: [],
+    timeWeightedValues: [],
     capitalInvested: [],
     dividendValues: [],
     annualReturns: [],
     cagr: 0,
+    timeWeightedCagr: 0,
     useIRR: false,
     totalContributed: 0,
     annualizedVolatility: 0,
