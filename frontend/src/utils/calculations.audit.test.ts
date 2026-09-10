@@ -2,12 +2,12 @@
  * Phase 3 audit tests — calculation engine correctness.
  *
  * All expected values are computed BY HAND in the comments; none are derived by
- * running the code under test. Three tests in the "KNOWN DEFECTS" describe are
- * intentionally failing findings (see audit/03_calc_correctness.md) and are
- * left in place per the audit instructions:
- *   - volatility counts contribution cashflows as market returns
- *   - max drawdown is masked by contribution cashflows
- *   - IRR discounts each contribution one month later than the simulation invests it
+ * running the code under test. The "regression: contribution-mode statistics"
+ * describe holds the three findings from audit/03_calc_correctness.md, fixed on
+ * branch fix/p0-calc-stats and kept as permanent regression tests:
+ *   - volatility counted contribution cashflows as market returns (F3-1)
+ *   - max drawdown was masked by contribution cashflows (F3-2)
+ *   - IRR discounted each contribution one month later than the simulation invests it (F3-3)
  */
 import { describe, test, expect } from 'vitest'
 import {
@@ -347,9 +347,9 @@ describe('computeChartBounds', () => {
 describe('Sharpe ratio assumptions (documented for the audit)', () => {
   test('risk-free rate is a hardcoded 2% annual, subtracted from CAGR', () => {
     // Documented finding, not a defect per se: Sharpe = (CAGR − 0.02) / annualizedVol.
-    // Note (a) 2% is hardcoded, (b) the numerator is a geometric annual return
-    // (or IRR when contributions are active — see KNOWN DEFECTS), not the mean
-    // monthly excess return convention.
+    // Note (a) 2% is hardcoded, (b) the numerator is the time-weighted geometric
+    // annual return (timeWeightedCagr, which equals cagr when there are no
+    // contributions), not the mean monthly excess return convention.
     expect(RISK_FREE_RATE).toBe(0.02)
 
     const dates = monthlyDates(2020, 1, 13)
@@ -360,9 +360,10 @@ describe('Sharpe ratio assumptions (documented for the audit)', () => {
   })
 })
 
-// ─── KNOWN DEFECTS — intentionally failing findings ──────────────────────────
+// ─── Regression: contribution-mode statistics (audit F3-1, F3-2, F3-3) ───────
+// Expected values are unchanged from the original failing findings.
 
-describe('KNOWN DEFECTS (intentionally failing — see audit/03_calc_correctness.md)', () => {
+describe('regression: contribution-mode statistics (fixed — see audit/03_calc_correctness.md)', () => {
   test('FINDING: volatility should be 0 for flat prices with contributions', () => {
     // Prices never move → there is zero market risk, so annualized volatility
     // must be 0. The engine derives monthly returns from the cumulative value

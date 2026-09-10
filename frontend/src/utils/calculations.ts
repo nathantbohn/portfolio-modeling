@@ -240,11 +240,14 @@ export function computePortfolio(
   let cagr: number
 
   if (useIRR) {
-    // Money-weighted return (IRR) via Newton's method on monthly cashflows
+    // Money-weighted return (IRR) via Newton's method on monthly cashflows.
+    // The sim deposits each month's contribution at the START of that month
+    // (time i−1, before the price move dates[i−1]→dates[i]), so the n−1
+    // deposits are dated 0..n−2 and the terminal value stands alone at n−1.
     const cashflows = new Float64Array(n)
-    cashflows[0] = -initialValue
+    cashflows[0] = -initialValue - contribution
     for (let i = 1; i < n - 1; i++) cashflows[i] = -contribution
-    cashflows[n - 1] = -contribution + finalValue // last contribution + terminal value
+    cashflows[n - 1] = finalValue
     cagr = calcAnnualizedIRR(cashflows)
   } else {
     cagr = timeWeightedCagr

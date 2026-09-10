@@ -60,7 +60,7 @@ export default function StatsPanel({ result, principal }: StatsPanelProps) {
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 h-full content-center">
       <StatCard
-        label={useIRR ? 'IRR' : 'CAGR'}
+        label={useIRR ? 'IRR (money-weighted)' : 'CAGR'}
         value={fmt(cagr)}
         color={cagr >= 0 ? 'green' : 'red'}
         sub={fmtDollar(finalValue) + (useIRR ? ' · ' + fmtDollar(totalContributed) + ' in' : '')}
