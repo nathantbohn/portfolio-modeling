@@ -27,7 +27,7 @@ export interface AnnualReturn {
  *
  * - MONEY-WEIGHTED (`cumulativeValues`): the actual dollar balance, deposits
  *   included. Used for the "Growth of $X" chart line, the capital-invested
- *   baseline, the ending balance and the IRR headline stat.
+ *   baseline, the ending balance and the IRR (secondary stat when contributing).
  * - TIME-WEIGHTED (`timeWeightedValues`): the principal grown by the chain-linked
  *   monthly returns of the simulated holdings, with contribution cash flows
  *   excluded (GIPS convention). Used for volatility, max drawdown, annual and
@@ -226,7 +226,7 @@ export function computePortfolio(
 
   // ── Derived statistics ─────────────────────────────────────────────────────
   // Risk and performance stats are time-weighted (contribution cash flows are
-  // not returns). Only the IRR headline is money-weighted.
+  // not returns). Only the IRR is money-weighted.
 
   const finalValue = cumulativeValues[n - 1].value
 
