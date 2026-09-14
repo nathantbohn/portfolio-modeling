@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import type { PriceData } from '../types'
+import { priceStore } from '../utils/dataAccess'
 
 export interface PriceDataState {
   data: PriceData | null
@@ -7,12 +8,11 @@ export interface PriceDataState {
   error: string | null
 }
 
-const API_URL = import.meta.env.VITE_API_URL as string | undefined
-
 /**
- * Fetches all price data on mount and caches it.
- * When VITE_API_URL is set, fetches from the backend API.
- * Otherwise falls back to the static JSON file.
+ * Loads base price data (ETFs, mutual funds, DIA, McMerica 25 and its
+ * constituents) from the static prices.json served with the frontend.
+ * Never contacts the backend: individual stocks are fetched on demand through
+ * the price store when a user adds them to a custom fund.
  */
 export function usePriceData(): PriceDataState {
   const [state, setState] = useState<PriceDataState>({
@@ -22,23 +22,18 @@ export function usePriceData(): PriceDataState {
   })
 
   useEffect(() => {
-    const controller = new AbortController()
-    const url = API_URL ? `${API_URL}/prices` : '/data/prices.json'
-
-    fetch(url, { signal: controller.signal })
-      .then((res) => {
-        if (!res.ok) throw new Error(`Failed to load price data: HTTP ${res.status}`)
-        return res.json() as Promise<PriceData>
-      })
-      .then((data) => {
-        setState({ data, loading: false, error: null })
-      })
-      .catch((err: unknown) => {
-        if (err instanceof DOMException && err.name === 'AbortError') return
-        setState({ data: null, loading: false, error: String(err) })
-      })
-
-    return () => controller.abort()
+    let active = true
+    priceStore.loadStatic().then(
+      (data) => {
+        if (active) setState({ data, loading: false, error: null })
+      },
+      (err: unknown) => {
+        if (active) setState({ data: null, loading: false, error: String(err) })
+      },
+    )
+    return () => {
+      active = false
+    }
   }, [])
 
   return state
