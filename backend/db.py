@@ -29,6 +29,9 @@ def init_db() -> None:
                 sector TEXT NOT NULL
             )
         """)
+        cols = {r["name"] for r in conn.execute("PRAGMA table_info(metadata)")}
+        if "active" not in cols:
+            conn.execute("ALTER TABLE metadata ADD COLUMN active INTEGER NOT NULL DEFAULT 1")
         conn.commit()
 
 
@@ -78,7 +81,7 @@ def search_metadata(query: str, limit: int = 10) -> list[sqlite3.Row]:
         return conn.execute(
             """
             SELECT ticker, name, sector FROM metadata
-            WHERE ticker LIKE ? OR name LIKE ?
+            WHERE (ticker LIKE ? OR name LIKE ?) AND active = 1
             ORDER BY
                 CASE WHEN ticker LIKE ? THEN 0 ELSE 1 END,
                 ticker
