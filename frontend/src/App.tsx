@@ -169,7 +169,8 @@ export default function App() {
 
   const rollingData = useMemo(() => {
     if (!result) return []
-    return calcRollingReturns(result.cumulativeValues, rollingWindow)
+    // Rolling returns are a performance stat → time-weighted series (contributions excluded)
+    return calcRollingReturns(result.timeWeightedValues, rollingWindow)
   }, [result, rollingWindow])
 
   const benchmarkData = useMemo(() => {

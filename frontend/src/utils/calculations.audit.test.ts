@@ -2,12 +2,12 @@
  * Phase 3 audit tests — calculation engine correctness.
  *
  * All expected values are computed BY HAND in the comments; none are derived by
- * running the code under test. Three tests in the "KNOWN DEFECTS" describe are
- * intentionally failing findings (see audit/03_calc_correctness.md) and are
- * left in place per the audit instructions:
- *   - volatility counts contribution cashflows as market returns
- *   - max drawdown is masked by contribution cashflows
- *   - IRR discounts each contribution one month later than the simulation invests it
+ * running the code under test. The "regression: contribution-mode statistics"
+ * describe holds the three findings from audit/03_calc_correctness.md, fixed on
+ * branch fix/p0-calc-stats and kept as permanent regression tests:
+ *   - volatility counted contribution cashflows as market returns (F3-1)
+ *   - max drawdown was masked by contribution cashflows (F3-2)
+ *   - IRR discounted each contribution one month later than the simulation invests it (F3-3)
  */
 import { describe, test, expect } from 'vitest'
 import {
@@ -15,6 +15,8 @@ import {
   computeBenchmark,
   computeChartBounds,
   calcRollingReturns,
+  calcMaxDrawdown,
+  calcAnnualReturns,
   RISK_FREE_RATE,
 } from './calculations'
 import type { Allocation, PriceData, PricePoint } from '../types'
@@ -168,6 +170,58 @@ describe('contributions', () => {
     const r = computePortfolio(alloc, data, { ...CFG, monthlyContribution: 100 }, 1000)
     expect(r.cumulativeValues[1].value).toBeCloseTo(2200, 6)
   })
+
+  test('time-weighted series is identical to the money-weighted series when contributions are 0', () => {
+    // With no external cash flows there is nothing to strip out, so the two
+    // series (and both CAGR fields) must coincide. Multi-fund, quarterly
+    // rebalance, mixed up/down path so the check is not trivially satisfied.
+    const dates = monthlyDates(2019, 3, 30)
+    const a = Array.from({ length: 30 }, (_, i) => 100 * Math.pow(1.02, i) * (i % 3 === 0 ? 0.95 : 1))
+    const b = Array.from({ length: 30 }, (_, i) => 80 + 10 * Math.sin(i / 2))
+    const c = Array.from({ length: 30 }, (_, i) => 50 * Math.pow(0.995, i))
+    const data: PriceData = {
+      A: priceSeries(dates, a),
+      B: priceSeries(dates, b),
+      C: priceSeries(dates, c),
+    }
+    const alloc: Allocation[] = [
+      { ticker: 'A', weight: 50 }, { ticker: 'B', weight: 30 }, { ticker: 'C', weight: 20 },
+    ]
+
+    const r = computePortfolio(alloc, data, { ...CFG, rebalanceFrequency: 'quarterly' }, 25_000)
+    expect(r.useIRR).toBe(false)
+    expect(r.timeWeightedValues).toHaveLength(r.cumulativeValues.length)
+    for (let i = 0; i < r.cumulativeValues.length; i++) {
+      expect(r.timeWeightedValues[i].date).toBe(r.cumulativeValues[i].date)
+      expect(r.timeWeightedValues[i].value).toBeCloseTo(r.cumulativeValues[i].value, 8)
+    }
+    expect(r.timeWeightedCagr).toBeCloseTo(r.cagr, 12)
+    // And the stats agree with recomputing them on the money-weighted series directly
+    expect(r.maxDrawdown).toBeCloseTo(calcMaxDrawdown(r.cumulativeValues), 12)
+    const annualFromMwr = calcAnnualReturns(r.cumulativeValues)
+    expect(r.annualReturns).toHaveLength(annualFromMwr.length)
+    for (let i = 0; i < annualFromMwr.length; i++) {
+      expect(r.annualReturns[i].return).toBeCloseTo(annualFromMwr[i].return, 12)
+    }
+  })
+
+  test('time-weighted series strips contribution cash flows but keeps market moves', () => {
+    // Prices 100 → 110 → 99 (+10%, −10%); P = 1000, C = 500 each month.
+    //   i=1: (1000+500) × 1.1 = 1650  → twr = 1650/1500 − 1 = +10%
+    //   i=2: (1650+500) × 0.9 = 1935  → twr = 1935/2150 − 1 = −10%
+    // MWR series [1000, 1650, 1935]; TWR series [1000, 1100, 990].
+    const dates = monthlyDates(2020, 1, 3)
+    const data: PriceData = { A: priceSeries(dates, [100, 110, 99]) }
+    const r = computePortfolio(
+      [{ ticker: 'A', weight: 100 }], data, { ...CFG, monthlyContribution: 500 }, 1000,
+    )
+    expect(r.cumulativeValues[1].value).toBeCloseTo(1650, 8)
+    expect(r.cumulativeValues[2].value).toBeCloseTo(1935, 8)
+    expect(r.timeWeightedValues[1].value).toBeCloseTo(1100, 8)
+    expect(r.timeWeightedValues[2].value).toBeCloseTo(990, 8)
+    // Max drawdown on the TWR series: (1100 − 990)/1100 = 10% (MWR series never falls)
+    expect(r.maxDrawdown).toBeCloseTo(0.1, 8)
+  })
 })
 
 // ─── Benchmark overlay ───────────────────────────────────────────────────────
@@ -293,9 +347,9 @@ describe('computeChartBounds', () => {
 describe('Sharpe ratio assumptions (documented for the audit)', () => {
   test('risk-free rate is a hardcoded 2% annual, subtracted from CAGR', () => {
     // Documented finding, not a defect per se: Sharpe = (CAGR − 0.02) / annualizedVol.
-    // Note (a) 2% is hardcoded, (b) the numerator is a geometric annual return
-    // (or IRR when contributions are active — see KNOWN DEFECTS), not the mean
-    // monthly excess return convention.
+    // Note (a) 2% is hardcoded, (b) the numerator is the time-weighted geometric
+    // annual return (timeWeightedCagr, which equals cagr when there are no
+    // contributions), not the mean monthly excess return convention.
     expect(RISK_FREE_RATE).toBe(0.02)
 
     const dates = monthlyDates(2020, 1, 13)
@@ -306,9 +360,10 @@ describe('Sharpe ratio assumptions (documented for the audit)', () => {
   })
 })
 
-// ─── KNOWN DEFECTS — intentionally failing findings ──────────────────────────
+// ─── Regression: contribution-mode statistics (audit F3-1, F3-2, F3-3) ───────
+// Expected values are unchanged from the original failing findings.
 
-describe('KNOWN DEFECTS (intentionally failing — see audit/03_calc_correctness.md)', () => {
+describe('regression: contribution-mode statistics (fixed — see audit/03_calc_correctness.md)', () => {
   test('FINDING: volatility should be 0 for flat prices with contributions', () => {
     // Prices never move → there is zero market risk, so annualized volatility
     // must be 0. The engine derives monthly returns from the cumulative value

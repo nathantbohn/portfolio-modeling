@@ -9,10 +9,11 @@ interface StatCardProps {
   label: string
   value: string
   color: 'green' | 'red' | 'neutral'
+  secondary?: { label: string; value: string }
   sub?: string
 }
 
-function StatCard({ label, value, color, sub }: StatCardProps) {
+function StatCard({ label, value, color, secondary, sub }: StatCardProps) {
   const colorClass =
     color === 'green'
       ? 'text-[#1D7B45]'
@@ -28,6 +29,11 @@ function StatCard({ label, value, color, sub }: StatCardProps) {
       <p className={`font-mono text-base font-semibold tabular-nums leading-none ${colorClass}`}>
         {value}
       </p>
+      {secondary && (
+        <p className="font-mono text-[10px] text-warm-200 tabular-nums mt-1">
+          {secondary.label} {secondary.value}
+        </p>
+      )}
       {sub && (
         <p className="font-mono text-[10px] text-warm-300 tabular-nums mt-1">{sub}</p>
       )}
@@ -54,15 +60,18 @@ export default function StatsPanel({ result, principal }: StatsPanelProps) {
     )
   }
 
-  const { cagr, useIRR, totalContributed, annualizedVolatility, maxDrawdown, sharpeRatio, cumulativeValues } = result
+  const { cagr, timeWeightedCagr, useIRR, totalContributed, annualizedVolatility, maxDrawdown, sharpeRatio, cumulativeValues } = result
   const finalValue = cumulativeValues[cumulativeValues.length - 1]?.value ?? principal
 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 h-full content-center">
+      {/* Headline CAGR is always time-weighted so Sharpe is reproducible from it;
+          with contributions the money-weighted IRR is shown beneath. */}
       <StatCard
-        label={useIRR ? 'IRR' : 'CAGR'}
-        value={fmt(cagr)}
-        color={cagr >= 0 ? 'green' : 'red'}
+        label="CAGR"
+        value={fmt(timeWeightedCagr)}
+        color={timeWeightedCagr >= 0 ? 'green' : 'red'}
+        secondary={useIRR ? { label: 'IRR (money-weighted)', value: fmt(cagr) } : undefined}
         sub={fmtDollar(finalValue) + (useIRR ? ' · ' + fmtDollar(totalContributed) + ' in' : '')}
       />
       <StatCard
