@@ -1,14 +1,16 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import type { CustomFundStock } from '../types'
+import {
+  API_URL,
+  priceStore,
+  searchStocks,
+  trackRequest,
+  type RequestPhase,
+  type StockSearchResult,
+} from '../utils/dataAccess'
+import BackendStatusLine from './BackendStatusLine'
 
-const API_URL = import.meta.env.VITE_API_URL as string | undefined
 const MAX_STOCKS = 25
-
-interface SearchResult {
-  ticker: string
-  name: string
-  sector: string
-}
 
 interface CustomFundBuilderProps {
   onClose: () => void
@@ -24,42 +26,68 @@ export default function CustomFundBuilder({ onClose, onCreate }: CustomFundBuild
   const [stocks, setStocks] = useState<CustomFundStock[]>([])
   const [weightMode, setWeightMode] = useState<'equal' | 'manual'>('equal')
   const [query, setQuery] = useState('')
-  const [results, setResults] = useState<SearchResult[]>([])
+  const [results, setResults] = useState<StockSearchResult[]>([])
   const [showResults, setShowResults] = useState(false)
-  const [searchLoading, setSearchLoading] = useState(false)
-  const [searchError, setSearchError] = useState(false)
+  const [searchPhase, setSearchPhase] = useState<RequestPhase | null>(null)
+  // Price loading state per constituent, keyed by ticker
+  const [priceStatus, setPriceStatus] = useState<Record<string, RequestPhase>>({})
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const searchRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const searchAbortRef = useRef<AbortController | null>(null)
+  const cancelSearchTrackRef = useRef<(() => void) | null>(null)
+  const cancelPriceTrackRef = useRef<Record<string, () => void>>({})
 
-  // Debounced search
+  // Search the backend; a newer query aborts the request in flight
   const doSearch = useCallback((q: string) => {
+    cancelSearchTrackRef.current?.()
+    searchAbortRef.current?.abort()
+    searchAbortRef.current = null
     if (!API_URL || q.length < 1) {
       setResults([])
-      setSearchLoading(false)
-      setSearchError(false)
+      setSearchPhase(null)
       return
     }
-    setSearchLoading(true)
-    setSearchError(false)
     const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), 45_000)
-    fetch(`${API_URL}/search?q=${encodeURIComponent(q)}`, { signal: controller.signal })
-      .then((res) => {
-        if (!res.ok) throw new Error('not ok')
-        return res.json() as Promise<SearchResult[]>
-      })
-      .then((data) => { setResults(data); setSearchError(false) })
-      .catch(() => { setResults([]); setSearchError(true) })
-      .finally(() => { setSearchLoading(false); clearTimeout(timer) })
+    searchAbortRef.current = controller
+    const request = searchStocks(q, controller.signal)
+    cancelSearchTrackRef.current = trackRequest(request, setSearchPhase)
+    request.then(
+      (data) => { if (searchAbortRef.current === controller) setResults(data) },
+      () => { if (searchAbortRef.current === controller) setResults([]) },
+    )
   }, [])
 
+  // Debounced search
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
-    if (query.length < 1) { setResults([]); return }
+    if (query.length < 1) { doSearch(''); return }
     debounceRef.current = setTimeout(() => doSearch(query), 300)
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
   }, [query, doSearch])
+
+  // Fetch a constituent's prices as soon as it is added. Tickers in the static
+  // prices.json resolve immediately; others hit the backend once per session.
+  const loadPrices = useCallback((ticker: string) => {
+    cancelPriceTrackRef.current[ticker]?.()
+    const setPhase = (phase: RequestPhase) =>
+      setPriceStatus((prev) => ({ ...prev, [ticker]: phase }))
+    if (priceStore.peek(ticker)) {
+      setPhase({ status: 'ready' })
+      return
+    }
+    cancelPriceTrackRef.current[ticker] = trackRequest(priceStore.getPrices(ticker), setPhase)
+  }, [])
+
+  // On close, stop reporting; requests still finish and populate the cache
+  useEffect(() => {
+    const priceTracks = cancelPriceTrackRef.current
+    return () => {
+      cancelSearchTrackRef.current?.()
+      searchAbortRef.current?.abort()
+      for (const cancel of Object.values(priceTracks)) cancel()
+    }
+  }, [])
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -72,7 +100,7 @@ export default function CustomFundBuilder({ onClose, onCreate }: CustomFundBuild
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  const addStock = (r: SearchResult) => {
+  const addStock = (r: StockSearchResult) => {
     if (stocks.length >= MAX_STOCKS) return
     if (stocks.some((s) => s.ticker === r.ticker)) return
     const equalWeight = 100 / (stocks.length + 1)
@@ -83,9 +111,17 @@ export default function CustomFundBuilder({ onClose, onCreate }: CustomFundBuild
     setQuery('')
     setResults([])
     setShowResults(false)
+    loadPrices(r.ticker)
   }
 
   const removeStock = (ticker: string) => {
+    cancelPriceTrackRef.current[ticker]?.()
+    delete cancelPriceTrackRef.current[ticker]
+    setPriceStatus((prev) => {
+      const next = { ...prev }
+      delete next[ticker]
+      return next
+    })
     setStocks((prev) => {
       const next = prev.filter((s) => s.ticker !== ticker)
       if (next.length === 0) return next
@@ -101,7 +137,11 @@ export default function CustomFundBuilder({ onClose, onCreate }: CustomFundBuild
   }
 
   const weightSum = stocks.reduce((s, st) => s + st.weight, 0)
-  const canCreate = fundName.trim().length > 0 && stocks.length > 0 &&
+  // A fund can only be created once every constituent has price data, so it
+  // never enters the tray or the portfolio in a broken state.
+  const pricesReady = stocks.every((s) => priceStatus[s.ticker]?.status === 'ready')
+  const pricesFailed = stocks.some((s) => priceStatus[s.ticker]?.status === 'error')
+  const canCreate = fundName.trim().length > 0 && stocks.length > 0 && pricesReady &&
     (weightMode === 'equal' || Math.abs(weightSum - 100) < 0.5)
 
   const handleCreate = () => {
@@ -160,22 +200,21 @@ export default function CustomFundBuilder({ onClose, onCreate }: CustomFundBuild
                 {showResults && query.length >= 1 && inputRef.current && (() => {
                   const rect = inputRef.current!.getBoundingClientRect()
                   const filtered = results.filter((r) => !stocks.some((s) => s.ticker === r.ticker))
-                  const showDropdown = searchLoading || searchError || filtered.length > 0
+                  const searching = searchPhase !== null && searchPhase.status !== 'ready'
+                  const showDropdown = searching || filtered.length > 0
                   if (!showDropdown) return null
                   return (
                     <div
                       className="fixed z-[60] bg-surface-1 border border-border rounded-md shadow-lg max-h-56 overflow-y-auto"
                       style={{ top: rect.bottom + 4, left: rect.left, width: rect.width }}
                     >
-                      {searchLoading ? (
-                        <div className="px-2.5 py-3 flex items-center justify-center gap-2">
-                          <div className="w-3 h-3 rounded-full border-2 border-warm-300 border-t-transparent animate-spin" />
-                          <span className="text-[11px] text-warm-300">Searching...</span>
-                        </div>
-                      ) : searchError ? (
-                        <div className="px-2.5 py-3 text-center">
-                          <p className="text-[11px] text-accent">Server unavailable</p>
-                          <p className="text-[10px] text-warm-300 mt-0.5">Try again in a moment</p>
+                      {searchPhase && searchPhase.status !== 'ready' ? (
+                        <div className="px-2.5 py-3">
+                          <BackendStatusLine
+                            phase={searchPhase}
+                            loadingLabel="Searching…"
+                            onRetry={() => doSearch(query)}
+                          />
                         </div>
                       ) : (
                         filtered.map((r) => (
@@ -240,47 +279,66 @@ export default function CustomFundBuilder({ onClose, onCreate }: CustomFundBuild
                 )}
               </label>
               <div className="space-y-1 max-h-48 overflow-y-auto">
-                {stocks.map((stock) => (
-                  <div key={stock.ticker} className="flex items-center gap-2 bg-surface-0 rounded px-2 py-1.5">
-                    <span className="text-[11px] font-semibold text-warm-50 w-10 flex-shrink-0">{stock.ticker}</span>
-                    <span className="text-[10px] text-warm-200 truncate flex-1">{stock.name}</span>
-                    {weightMode === 'manual' ? (
-                      <div className="flex items-center gap-0.5 flex-shrink-0">
-                        <input
-                          type="number"
-                          min={0} max={100} step={0.1}
-                          value={stock.weight.toFixed(1)}
-                          onChange={(e) => {
-                            const v = parseFloat(e.target.value)
-                            if (!isNaN(v)) setStockWeight(stock.ticker, v)
-                          }}
-                          className="w-12 bg-surface-1 border border-border rounded px-1 py-0.5 text-[10px] font-mono text-warm-50 text-right tabular-nums focus:outline-none focus:border-warm-300"
-                        />
-                        <span className="text-warm-300 text-[10px]">%</span>
+                {stocks.map((stock) => {
+                  const phase = priceStatus[stock.ticker]
+                  return (
+                    <div key={stock.ticker} className="bg-surface-0 rounded px-2 py-1.5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-semibold text-warm-50 w-10 flex-shrink-0">{stock.ticker}</span>
+                        <span className="text-[10px] text-warm-200 truncate flex-1">{stock.name}</span>
+                        {weightMode === 'manual' ? (
+                          <div className="flex items-center gap-0.5 flex-shrink-0">
+                            <input
+                              type="number"
+                              min={0} max={100} step={0.1}
+                              value={stock.weight.toFixed(1)}
+                              onChange={(e) => {
+                                const v = parseFloat(e.target.value)
+                                if (!isNaN(v)) setStockWeight(stock.ticker, v)
+                              }}
+                              className="w-12 bg-surface-1 border border-border rounded px-1 py-0.5 text-[10px] font-mono text-warm-50 text-right tabular-nums focus:outline-none focus:border-warm-300"
+                            />
+                            <span className="text-warm-300 text-[10px]">%</span>
+                          </div>
+                        ) : (
+                          <span className="text-[10px] font-mono text-warm-300 flex-shrink-0">
+                            {(100 / stocks.length).toFixed(1)}%
+                          </span>
+                        )}
+                        <button
+                          onClick={() => removeStock(stock.ticker)}
+                          className="text-warm-400 hover:text-warm-50 transition-colors flex-shrink-0"
+                          type="button"
+                        >
+                          <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
+                            <path d="M2 2l8 8M10 2L2 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                          </svg>
+                        </button>
                       </div>
-                    ) : (
-                      <span className="text-[10px] font-mono text-warm-300 flex-shrink-0">
-                        {(100 / stocks.length).toFixed(1)}%
-                      </span>
-                    )}
-                    <button
-                      onClick={() => removeStock(stock.ticker)}
-                      className="text-warm-400 hover:text-warm-50 transition-colors flex-shrink-0"
-                      type="button"
-                    >
-                      <svg width="10" height="10" viewBox="0 0 12 12" fill="none">
-                        <path d="M2 2l8 8M10 2L2 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                      </svg>
-                    </button>
-                  </div>
-                ))}
+                      {phase && phase.status !== 'ready' && (
+                        <div className="mt-1">
+                          <BackendStatusLine
+                            phase={phase}
+                            loadingLabel="Loading prices…"
+                            onRetry={() => loadPrices(stock.ticker)}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="px-4 py-3 border-t border-border flex justify-end gap-2">
+        <div className="px-4 py-3 border-t border-border flex items-center justify-end gap-2">
+          {stocks.length > 0 && !pricesReady && (
+            <span className="mr-auto text-[10px] text-warm-300">
+              {pricesFailed ? "Retry or remove stocks that didn't load" : 'Waiting for prices…'}
+            </span>
+          )}
           <button
             onClick={onClose}
             className="px-3 py-1.5 text-[11px] text-warm-200 hover:text-warm-50 border border-border rounded-md transition-colors"
