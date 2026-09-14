@@ -1,9 +1,3 @@
-export interface Fund {
-  ticker: string
-  name: string
-  color: string
-}
-
 export const FUND_META: Record<string, { name: string; color: string }> = {
   VOO:  { name: 'Vanguard S&P 500',            color: '#8B1A2B' },  // burgundy
   BND:  { name: 'Vanguard Total Bond',          color: '#2A6B6B' },  // deep teal
@@ -39,8 +33,6 @@ export interface PricePoint {
 
 export type PriceData = Record<string, PricePoint[]>
 
-export type ReturnSeries = { date: string; value: number }[]
-
 export interface CustomFundStock {
   ticker: string
   name: string
@@ -53,11 +45,4 @@ export interface CustomFund {
   color: string
   stocks: CustomFundStock[]
   weightMode: 'equal' | 'manual'
-}
-
-export interface PortfolioStats {
-  cagr: number
-  annualizedVolatility: number
-  maxDrawdown: number
-  sharpeRatio: number
 }

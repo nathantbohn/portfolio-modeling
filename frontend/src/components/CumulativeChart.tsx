@@ -173,7 +173,7 @@ export default function CumulativeChart({ data, capitalInvested, dividendData, b
 
     const g = sel.select<SVGGElement>('.chart-g')
 
-    const xAxis = d3.axisBottom(x).ticks(Math.min(parsed.length, 8)).tickFormat(d3.timeFormat('%Y') as any).tickSize(0).tickPadding(8)
+    const xAxis = d3.axisBottom<Date>(x).ticks(Math.min(parsed.length, 8)).tickFormat(d3.timeFormat('%Y')).tickSize(0).tickPadding(8)
     const yAxis = d3.axisLeft(y).ticks(5).tickFormat((d) => `$${d3.format(',.0f')(d as number)}`).tickSize(-w).tickPadding(8)
 
     g.select<SVGGElement>('.x-axis')
